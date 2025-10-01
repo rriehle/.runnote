@@ -1,0 +1,223 @@
+#!/usr/bin/env bb
+
+(ns ^:clj-kondo/ignore runnote-launch
+  "RunNotes launcher - creates new RunNotes sessions with intelligent defaults.
+   Uses shared config-core library for configuration management."
+  (:require [clojure.string :as str]
+            [babashka.fs :as fs]
+            [clojure.java.shell :as shell]))
+
+;; ============================================================================
+;; Library Loading
+;; ============================================================================
+
+(def lib-dir (str (System/getenv "HOME") "/.lib"))
+(load-file (str lib-dir "/config-core.bb"))
+
+;; ============================================================================
+;; Date/Time Utilities
+;; ============================================================================
+
+(defn current-date []
+  (.format (java.text.SimpleDateFormat. "yyyy-MM-dd") (java.util.Date.)))
+
+(defn current-time []
+  (.format (java.text.SimpleDateFormat. "HH:mm") (java.util.Date.)))
+
+(defn current-datetime []
+  (str (current-date) " " (current-time)))
+
+;; ============================================================================
+;; Configuration
+;; ============================================================================
+
+(defn load-runnote-config
+  "Load RunNotes configuration and extract key settings"
+  []
+  (let [config (config-core/load-config :runnote)
+        rn-config (config-core/get-config-value config [:runnote])]
+    {:config config
+     :runnote-dir (config-core/resolve-runnote-dir config)
+     :template-dir (config-core/resolve-runnote-template-dir config)
+     :phases (or (:phases rn-config) #{"research" "planning" "implementation" "review"})
+     :editor (or (:editor rn-config) (System/getenv "EDITOR") "vim")}))
+
+;; ============================================================================
+;; Phase Validation
+;; ============================================================================
+
+(defn validate-phase
+  "Validate that phase is in allowed set"
+  [phase valid-phases]
+  (when-not (valid-phases phase)
+    (println (str "Error: Unknown phase '" phase "'"))
+    (println (str "Available phases: " (str/join ", " (sort valid-phases))))
+    (System/exit 1)))
+
+;; ============================================================================
+;; Filename Creation
+;; ============================================================================
+
+(defn create-filename
+  "Create RunNotes filename following naming convention:
+   RunNotes-YYYY-MM-DD-TopicName-phase.md"
+  [runnote-dir phase topic]
+  (if topic
+    (str runnote-dir "/RunNotes-" (current-date) "-" topic "-" phase ".md")
+    (str runnote-dir "/RunNotes-" (current-date) "-" phase ".md")))
+
+(defn confirm-overwrite
+  "Confirm before overwriting existing file"
+  [filename]
+  (when (fs/exists? filename)
+    (println (str "Warning: File '" filename "' already exists!"))
+    (print "Overwrite? (y/N): ")
+    (flush)
+    (let [response (read-line)]
+      (when-not (re-matches #"^[Yy].*" (or response ""))
+        (println "Aborted.")
+        (System/exit 1)))))
+
+;; ============================================================================
+;; Template Processing
+;; ============================================================================
+
+(defn find-template
+  "Find template file with hierarchy:
+   1. Project template (if exists)
+   2. User template (built-in)"
+  [template-dir phase]
+  (let [template-file (str template-dir "/" phase ".md")]
+    (if (fs/exists? template-file)
+      template-file
+      (do
+        (println (str "Error: Template file not found: " template-file))
+        (println (str "Expected template at: " template-file))
+        (System/exit 1)))))
+
+(defn create-edn-metadata-block
+  "Create EDN metadata block for the document"
+  [phase tags thinking-mode]
+  (let [tag-set (into #{} (map keyword tags))
+        metadata {:phase phase
+                  :tag tag-set
+                  :status :active
+                  :thinking-mode thinking-mode
+                  :date {:created (current-date)}}]
+    (str "```edn :metadata\n"
+         (pr-str metadata)
+         "\n```")))
+
+(defn replace-template-placeholders
+  "Replace template placeholders with actual values"
+  [content phase topic tags thinking-mode]
+  (let [datetime (current-datetime)
+        edn-block (create-edn-metadata-block phase tags thinking-mode)
+        ;; Simple placeholder replacement for now
+        updated (-> content
+                    (str/replace "YYYY-MM-DD HH:MM" datetime)
+                    (str/replace "YYYY-MM-DD" (current-date))
+                    (str/replace "[Topic]" (or topic "New Topic"))
+                    (str/replace ":set-me" (str/join " " (map #(str ":" (name %)) tags)))
+                    (str/replace "\"think hard\"" (str "\"" thinking-mode "\"")))]
+    updated))
+
+(defn process-template
+  "Load and process template with placeholders"
+  [template-file phase topic tags thinking-mode]
+  (let [content (slurp template-file)]
+    (replace-template-placeholders content phase topic tags thinking-mode)))
+
+;; ============================================================================
+;; Main Logic
+;; ============================================================================
+
+(defn create-runnote
+  "Create a new RunNotes file from template"
+  [phase topic tags thinking-mode]
+  (let [cfg (load-runnote-config)
+        runnote-dir (:runnote-dir cfg)
+        template-dir (:template-dir cfg)
+        filename (create-filename runnote-dir phase topic)]
+
+    ;; Ensure runnote directory exists
+    (when-not (fs/exists? runnote-dir)
+      (println (str "Error: RunNotes directory not found: " runnote-dir))
+      (println "Create the directory first or run initialization.")
+      (System/exit 1))
+
+    ;; Check for overwrite
+    (confirm-overwrite filename)
+
+    ;; Find and process template
+    (let [template-file (find-template template-dir phase)
+          processed-content (process-template template-file phase topic tags thinking-mode)]
+
+      ;; Write file
+      (spit filename processed-content)
+      (println (str "Created: " filename))
+
+      ;; Open in editor (if configured or $EDITOR set)
+      (let [editor (or (:editor cfg) (System/getenv "EDITOR"))]
+        (when (and editor (not (str/blank? editor)))
+          (shell/sh editor filename)))
+
+      filename)))
+
+(defn print-usage []
+  (println "Usage: runnote-launch <phase> [topic] [options]")
+  (println "")
+  (println "Phases:")
+  (println "  research        - Investigation and discovery phase")
+  (println "  planning        - Architecture and implementation planning")
+  (println "  implementation  - Active development work")
+  (println "  review          - Retrospective and analysis")
+  (println "  debug           - Debugging and troubleshooting")
+  (println "  hotfix          - Urgent fixes and quick solutions")
+  (println "  performance     - Performance analysis and optimization")
+  (println "  security        - Security analysis and hardening")
+  (println "  testing         - Testing strategy and execution")
+  (println "")
+  (println "Options:")
+  (println "  --tags TAG1,TAG2     Specify tags (comma-separated)")
+  (println "  --thinking-mode MODE Specify thinking mode (think hard|think harder|ultrathink)")
+  (println "  --help, -h           Show this help")
+  (println "")
+  (println "Examples:")
+  (println "  runnote-launch research UIComponents")
+  (println "  runnote-launch planning DatabaseMigration --tags feature,architecture")
+  (println "  runnote-launch hotfix CriticalBug --thinking-mode ultrathink"))
+
+(defn parse-args
+  "Parse command line arguments (simplified version)"
+  [args]
+  (let [phase (first args)
+        topic (second args)
+        ;; Simple defaults for now
+        tags #{:feature}
+        thinking-mode "think hard"]
+    {:phase phase
+     :topic topic
+     :tags tags
+     :thinking-mode thinking-mode}))
+
+(defn main [& args]
+  (when (or (empty? args) (#{"-h" "--help"} (first args)))
+    (print-usage)
+    (System/exit (if (empty? args) 1 0)))
+
+  (let [cfg (load-runnote-config)
+        {:keys [phase topic tags thinking-mode]} (parse-args args)]
+
+    (when-not phase
+      (println "Error: Phase is required")
+      (print-usage)
+      (System/exit 1))
+
+    (validate-phase phase (:phases cfg))
+
+    (println (str "Launching " phase " phase for: " (or topic "New Session")))
+    (create-runnote phase topic tags thinking-mode)))
+
+(when (= *file* (System/getProperty "babashka.file"))
+  (apply main *command-line-args*))

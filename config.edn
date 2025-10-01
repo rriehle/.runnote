@@ -1,0 +1,30 @@
+{:runnote
+ {;; Default directory for RunNotes (singular per ADR-00035)
+  :dir "runnote"
+
+  ;; Template directory (built-in templates)
+  :template-dir "~/.runnote/template"
+
+  ;; Default editor (nil means use $EDITOR from environment)
+  :editor nil
+
+  ;; Valid phases
+  :phases #{"research" "planning" "implementation" "review"
+            "debug" "hotfix" "performance" "security" "testing" "code-review"}
+
+  ;; Default tag vocabulary (projects can extend)
+  :valid-tags #{:feature :bugfix :refactor :architecture :ui :testing
+                :security :performance :debugging :documentation
+                :infrastructure :database :api :deployment :monitoring}
+
+  ;; Default thinking mode for Claude
+  :default-thinking-mode "think hard"
+
+  ;; ADR integration settings
+  :adr-integration
+  {:enabled true                    ; ADR features enabled by default
+   :adr-bin-dir "~/.adr/bin"        ; Location of ADR tools
+   :adr-dir "doc/adr"               ; Default ADR location (singular)
+   :require-adr-refs false          ; ADR references optional by default
+   :search-on-planning false        ; Auto-search ADRs in planning phase
+   :mention-in-templates true}}}    ; Include ADR guidance in templates
