@@ -6,19 +6,33 @@ RunNotes is a structured system for capturing development knowledge in real-time
 
 ### Installation
 
-1. **Clone/install RunNotes** (wherever you've placed this):
+1. Clone this repository to `~/.runnote`:
+
    ```bash
-   # Ensure ~/.runnote/bin is in your PATH
-   export PATH="$HOME/.runnote/bin:$PATH"
+   git clone <repo-url> ~/.runnote
    ```
 
-2. **Initialize in your project**:
+2. Add `~/.runnote/bin` to your PATH:
+
+   ```bash
+   # For bash
+   echo 'export PATH="$HOME/.runnote/bin:$PATH"' >> ~/.bashrc
+   source ~/.bashrc
+
+   # For zsh
+   echo 'export PATH="$HOME/.runnote/bin:$PATH"' >> ~/.zshrc
+   source ~/.zshrc
+   ```
+
+3. **Initialize in your project**:
+
    ```bash
    cd your-project
    runnote-init
    ```
 
-3. **Create your first RunNotes session**:
+4. **Create your first RunNotes session**:
+
    ```bash
    runnote-launch research YourTopic
    ```
