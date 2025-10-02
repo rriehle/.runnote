@@ -1,0 +1,280 @@
+#!/usr/bin/env bb
+
+(ns ^:clj-kondo/ignore runnote-search
+  "RunNotes search tool - search existing RunNotes by tag, text, phase, or state.
+   Uses shared config-core and metadata-parser libraries."
+  (:require [clojure.string :as str]
+            [babashka.fs :as fs]))
+
+;; ============================================================================
+;; Library Loading
+;; ============================================================================
+
+(def lib-dir (str (System/getenv "HOME") "/.lib"))
+(load-file (str lib-dir "/config-core.bb"))
+(load-file (str lib-dir "/metadata-parser.bb"))
+
+(def extract-edn-metadata (:extract-edn-metadata metadata-parser/exports))
+
+;; ============================================================================
+;; Configuration
+;; ============================================================================
+
+(defn load-runnote-config
+  "Load RunNotes configuration and get runnote directory"
+  []
+  (let [config (config-core/load-config :runnote)]
+    {:runnote-dir (config-core/resolve-runnote-dir config)}))
+
+;; ============================================================================
+;; Tag Extraction (Legacy Format Support)
+;; ============================================================================
+
+(defn clean-tag
+  "Clean a single tag string by removing commas and trimming"
+  [tag-str]
+  (str/replace (str/trim tag-str) #",$" ""))
+
+(defn split-tag-text
+  "Split tag text on commas and/or spaces"
+  [tag-text]
+  (if (str/includes? tag-text ",")
+    (mapcat #(str/split % #" ") (str/split tag-text #","))
+    (str/split tag-text #" ")))
+
+(defn extract-tags
+  "Extract keyword tags from RunNotes content (legacy format)"
+  [content]
+  (let [tag-line (first (filter #(str/includes? % "> **Tags**:")
+                                (str/split-lines content)))]
+    (when tag-line
+      (let [tag-text (second (str/split tag-line #": "))]
+        (when tag-text
+          (->> (split-tag-text tag-text)
+               (map clean-tag)
+               (filter #(str/starts-with? % ":"))
+               (vec)))))))
+
+;; ============================================================================
+;; Metadata Extraction
+;; ============================================================================
+
+(defn extract-metadata
+  "Extract metadata from a RunNotes file using EDN parser"
+  [file]
+  (let [content (slurp (str file))
+        lines (str/split-lines content)
+        title (first lines)
+        edn-metadata (extract-edn-metadata content)]
+    (if edn-metadata
+      ;; New EDN format
+      {:file (fs/file-name file)
+       :path file
+       :title (str/trim (str/replace title #"^#+" ""))
+       :phase (:phase edn-metadata)
+       :tags (map #(str ":" (name %)) (:tag edn-metadata))
+       :state (when-let [s (:status edn-metadata)]
+                (name s))
+       :date (let [parts (str/split (fs/file-name file) #"-")]
+               (str/join "-" (take 3 (drop 1 parts))))}
+      ;; Fall back to old format
+      (let [extract-field (fn [field-name]
+                            (some #(when (str/includes? % (str "> **" field-name "**:"))
+                                     (str/trim (second (str/split % #":"))))
+                                  lines))]
+        {:file (fs/file-name file)
+         :path file
+         :title (str/trim (str/replace title #"^#+" ""))
+         :phase (extract-field "Phase")
+         :tags (extract-tags content)
+         :state (extract-field "Current State")
+         :date (let [parts (str/split (fs/file-name file) #"-")]
+                 (str/join "-" (take 3 (drop 1 parts))))}))))
+
+;; ============================================================================
+;; Search Functions
+;; ============================================================================
+
+(defn search-by-tag
+  "Find all RunNotes with a specific tag"
+  [runnote-dir tag]
+  (let [files (fs/glob runnote-dir "RunNotes-*.md")
+        tag (if (str/starts-with? tag ":") tag (str ":" tag))]
+    (filter #(some #{tag} (:tags %))
+            (map extract-metadata files))))
+
+(defn search-by-text
+  "Full-text search within RunNotes"
+  [runnote-dir query]
+  (let [files (fs/glob runnote-dir "RunNotes-*.md")
+        query-lower (str/lower-case query)]
+    (filter (fn [file]
+              (str/includes? (str/lower-case (slurp (str file))) query-lower))
+            files)))
+
+(defn search-by-phase
+  "Find all RunNotes in a specific phase"
+  [runnote-dir phase]
+  (let [files (fs/glob runnote-dir "RunNotes-*.md")]
+    (filter #(and (:phase %)
+                  (str/includes? (str/lower-case (:phase %))
+                                 (str/lower-case phase)))
+            (map extract-metadata files))))
+
+(defn search-by-state
+  "Find all RunNotes in a specific state"
+  [runnote-dir state]
+  (let [files (fs/glob runnote-dir "RunNotes-*.md")
+        state-emoji (case (str/lower-case state)
+                      "active" "🟢"
+                      "investigating" "🟡"
+                      "blocked" "🔴"
+                      state)]
+    (filter #(and (:state %)
+                  (str/includes? (:state %) state-emoji))
+            (map extract-metadata files))))
+
+(defn list-all-tags
+  "List all unique tags used across RunNotes"
+  [runnote-dir]
+  (let [files (fs/glob runnote-dir "RunNotes-*.md")
+        all-tags (mapcat :tags (map extract-metadata files))]
+    (sort (distinct all-tags))))
+
+(defn summary-report
+  "Generate a summary report of all RunNotes"
+  [runnote-dir]
+  (let [files (fs/glob runnote-dir "RunNotes-*.md")
+        metadata (map extract-metadata files)
+        by-phase (group-by :phase metadata)
+        all-tags (mapcat :tags metadata)]
+    {:total-files (count files)
+     :by-phase (into {} (map (fn [[k v]] [k (count v)]) by-phase))
+     :recent-files (take 10 (reverse (sort-by :date metadata)))
+     :popular-tags (take 10 (reverse (sort-by val (frequencies all-tags))))
+     :active-sessions (count (filter #(= (:state %) "active") metadata))
+     :blocked-sessions (count (filter #(and (:state %)
+                                            (str/includes? (:state %) "🔴"))
+                                      metadata))}))
+
+;; ============================================================================
+;; Output Formatting
+;; ============================================================================
+
+(defn format-results
+  "Format search results for display"
+  [results format-type]
+  (case format-type
+    "simple" (doseq [r results]
+               (println (:file r)))
+    "detailed" (doseq [r results]
+                 (println "\n📄" (:title r))
+                 (println "   File:" (:file r))
+                 (println "   Phase:" (:phase r))
+                 (println "   Tags:" (str/join " " (:tags r)))
+                 (when (:state r)
+                   (println "   State:" (:state r))))
+    "json" (println (pr-str results))
+    (doseq [r results]
+      (println (:file r)))))
+
+;; ============================================================================
+;; Main Logic
+;; ============================================================================
+
+(defn print-usage []
+  (println "RunNotes Search Tool")
+  (println "")
+  (println "Usage:")
+  (println "  runnote-search tag <tag>         - Search by tag")
+  (println "  runnote-search text <query>      - Full-text search")
+  (println "  runnote-search phase <phase>     - Search by phase")
+  (println "  runnote-search state <state>     - Search by state (active/blocked/investigating)")
+  (println "  runnote-search list-tags         - List all tags")
+  (println "  runnote-search summary           - Generate summary report")
+  (println "")
+  (println "Options:")
+  (println "  --format [simple|detailed|json]  - Output format (default: simple)")
+  (println "")
+  (println "Examples:")
+  (println "  runnote-search tag :debugging")
+  (println "  runnote-search text \"hypothesis\"")
+  (println "  runnote-search phase implementation")
+  (println "  runnote-search state blocked")
+  (println "  runnote-search summary"))
+
+(defn main [& args]
+  (if (empty? args)
+    (print-usage)
+    (let [cfg (load-runnote-config)
+          runnote-dir (:runnote-dir cfg)
+          command (first args)
+          cmd-args (rest args)
+          format-idx (.indexOf (vec args) "--format")
+          format-type (if (>= format-idx 0)
+                        (nth args (inc format-idx) "simple")
+                        "simple")
+          search-args (if (>= format-idx 0)
+                        (take format-idx (rest args))
+                        cmd-args)]
+
+      ;; Check if runnote directory exists
+      (when-not (fs/exists? runnote-dir)
+        (println (str "Error: RunNotes directory not found: " runnote-dir))
+        (println "Create the directory or check your configuration.")
+        (System/exit 1))
+
+      (case command
+        "tag" (when (first search-args)
+                (let [results (search-by-tag runnote-dir (first search-args))]
+                  (if (empty? results)
+                    (println "No RunNotes found with tag" (first search-args))
+                    (format-results results format-type))))
+
+        "text" (when (first search-args)
+                 (let [results (search-by-text runnote-dir (first search-args))]
+                   (if (empty? results)
+                     (println "No RunNotes found containing" (first search-args))
+                     (doseq [file results]
+                       (println (fs/file-name file))))))
+
+        "phase" (when (first search-args)
+                  (let [results (search-by-phase runnote-dir (first search-args))]
+                    (if (empty? results)
+                      (println "No RunNotes found in phase" (first search-args))
+                      (format-results results format-type))))
+
+        "state" (when (first search-args)
+                  (let [results (search-by-state runnote-dir (first search-args))]
+                    (if (empty? results)
+                      (println "No RunNotes found in state" (first search-args))
+                      (format-results results format-type))))
+
+        "list-tags" (let [tags (list-all-tags runnote-dir)]
+                      (if (empty? tags)
+                        (println "No tags found")
+                        (do (println "\nAll tags used in RunNotes:")
+                            (doseq [tag tags]
+                              (println " " tag)))))
+
+        "summary" (let [report (summary-report runnote-dir)]
+                    (println "\n📊 RunNotes Summary Report")
+                    (println "========================")
+                    (println "Total Files:" (:total-files report))
+                    (println "\nBy Phase:")
+                    (doseq [[phase count] (:by-phase report)]
+                      (println (format "  %-20s %d" (or phase "unknown") count)))
+                    (println "\nActive Sessions:" (:active-sessions report))
+                    (println "Blocked Sessions:" (:blocked-sessions report))
+                    (println "\nPopular Tags:")
+                    (doseq [[tag count] (:popular-tags report)]
+                      (println (format "  %-20s %d" tag count)))
+                    (println "\nRecent Files:")
+                    (doseq [file (take 5 (:recent-files report))]
+                      (println "  " (:file file))))
+
+        (do (println "Unknown command:" command)
+            (print-usage))))))
+
+(when (= *file* (System/getProperty "babashka.file"))
+  (apply main *command-line-args*))

@@ -1,0 +1,224 @@
+#!/usr/bin/env bb
+
+(ns ^:clj-kondo/ignore runnote-init
+  "Initialize RunNotes in a project.
+   Creates directory structure and optional project config."
+  (:require [clojure.string :as str]
+            [babashka.fs :as fs]
+            [clojure.java.shell :as shell]))
+
+;; ============================================================================
+;; Library Loading
+;; ============================================================================
+
+(def lib-dir (str (System/getenv "HOME") "/.lib"))
+(load-file (str lib-dir "/config-core.bb"))
+
+;; ============================================================================
+;; Interactive Prompts
+;; ============================================================================
+
+(defn prompt
+  "Prompt user for input with default"
+  [question default]
+  (print (str question " [" default "]: "))
+  (flush)
+  (let [response (str/trim (read-line))]
+    (if (str/blank? response) default response)))
+
+(defn confirm
+  "Get yes/no confirmation"
+  [question]
+  (print (str question " (y/N): "))
+  (flush)
+  (let [response (str/lower-case (str/trim (read-line)))]
+    (contains? #{"y" "yes"} response)))
+
+;; ============================================================================
+;; Project Detection
+;; ============================================================================
+
+(defn detect-project-info
+  "Detect project context (git, name, etc.)"
+  []
+  (let [project-root (config-core/discover-project-root)
+        git-root (config-core/find-git-root project-root)
+        project-name (when git-root
+                       (fs/file-name (fs/path git-root)))]
+    {:project-root project-root
+     :git-root git-root
+     :project-name (or project-name "project")}))
+
+;; ============================================================================
+;; Initialization
+;; ============================================================================
+
+(defn create-runnote-directory
+  "Create RunNotes directory"
+  [dir-path]
+  (if (fs/exists? dir-path)
+    (println (str "✓ Directory already exists: " dir-path))
+    (do
+      (fs/create-dirs dir-path)
+      (println (str "✓ Created RunNotes directory: " dir-path)))))
+
+(defn create-project-config
+  "Create project-specific .runnote.edn config"
+  [project-root project-name dir-name]
+  (let [config-path (str (fs/path project-root ".runnote.edn"))
+        config-content (str "{:runnote\n"
+                            " {;; Project-specific RunNotes directory\n"
+                            "  :dir \"" dir-name "\"\n\n"
+                            "  ;; Project metadata\n"
+                            "  :project-name \"" project-name "\"\n"
+                            "  :project-tags #{:set-me}\n\n"
+                            "  ;; Optional: customize thinking mode\n"
+                            "  ;; :default-thinking-mode \"think harder\"\n\n"
+                            "  ;; Optional: ADR integration settings\n"
+                            "  ;; :adr-integration\n"
+                            "  ;; {:enabled true\n"
+                            "  ;;  :adr-dir \"doc/adr\"\n"
+                            "  ;;  :require-adr-refs false}}}\n")]
+    (if (fs/exists? config-path)
+      (println (str "⚠ Config already exists: " config-path))
+      (do
+        (spit config-path config-content)
+        (println (str "✓ Created project config: " config-path))))))
+
+(defn create-readme
+  "Create README in RunNotes directory"
+  [runnote-dir project-name]
+  (let [readme-path (str (fs/path runnote-dir "README.md"))
+        readme-content (str "# RunNotes - " project-name "\n\n"
+                            "Development knowledge capture and documentation.\n\n"
+                            "## Usage\n\n"
+                            "Create new RunNotes session:\n"
+                            "```bash\n"
+                            "runnote-launch research TopicName\n"
+                            "runnote-launch planning TopicName\n"
+                            "runnote-launch implementation TopicName\n"
+                            "```\n\n"
+                            "Search existing RunNotes:\n"
+                            "```bash\n"
+                            "runnote-search summary\n"
+                            "runnote-search tag :debugging\n"
+                            "runnote-search phase research\n"
+                            "```\n\n"
+                            "## Phases\n\n"
+                            "- **research**: Investigation and discovery\n"
+                            "- **planning**: Architecture and approach decisions\n"
+                            "- **implementation**: Active development work\n"
+                            "- **review**: Retrospective and analysis\n\n"
+                            "## Documentation\n\n"
+                            "See https://docs.claude.com/claude-code for full RunNotes documentation.\n")]
+    (if (fs/exists? readme-path)
+      (println (str "⚠ README already exists: " readme-path))
+      (do
+        (spit readme-path readme-content)
+        (println (str "✓ Created README: " readme-path))))))
+
+;; ============================================================================
+;; Main Logic
+;; ============================================================================
+
+(defn print-usage []
+  (println "Usage: runnote-init [options]")
+  (println "")
+  (println "Options:")
+  (println "  --dir NAME      RunNotes directory name (default: runnote)")
+  (println "  --no-config     Skip creating project config file")
+  (println "  --no-readme     Skip creating README")
+  (println "  --help, -h      Show this help")
+  (println "")
+  (println "Examples:")
+  (println "  runnote-init                    # Interactive setup")
+  (println "  runnote-init --dir runnotes     # Use 'runnotes' (plural)")
+  (println "  runnote-init --no-config        # Directory only, no config"))
+
+(defn parse-args
+  "Parse command line arguments"
+  [args]
+  (loop [remaining args
+         opts {:dir-name "runnote"
+               :create-config true
+               :create-readme true
+               :interactive true}]
+    (cond
+      (empty? remaining)
+      opts
+
+      (#{"-h" "--help"} (first remaining))
+      (do (print-usage) (System/exit 0))
+
+      (= "--dir" (first remaining))
+      (recur (drop 2 remaining)
+             (assoc opts :dir-name (second remaining) :interactive false))
+
+      (= "--no-config" (first remaining))
+      (recur (rest remaining)
+             (assoc opts :create-config false :interactive false))
+
+      (= "--no-readme" (first remaining))
+      (recur (rest remaining)
+             (assoc opts :create-readme false :interactive false))
+
+      :else
+      (do (println (str "Unknown option: " (first remaining)))
+          (print-usage)
+          (System/exit 1)))))
+
+(defn interactive-setup
+  "Interactive setup with prompts"
+  [project-info default-dir]
+  (println "\n🎯 RunNotes Initialization")
+  (println "=======================")
+  (println (str "Project: " (:project-name project-info)))
+  (println (str "Location: " (:project-root project-info)))
+  (println "")
+
+  (let [dir-name (prompt "RunNotes directory name" default-dir)
+        create-config (confirm "Create project config (.runnote.edn)?")
+        create-readme (confirm "Create README in RunNotes directory?")]
+    {:dir-name dir-name
+     :create-config create-config
+     :create-readme create-readme
+     :interactive false}))
+
+(defn main [& args]
+  (let [project-info (detect-project-info)
+        project-root (:project-root project-info)
+        project-name (:project-name project-info)
+        opts (parse-args args)
+        final-opts (if (:interactive opts)
+                     (interactive-setup project-info (:dir-name opts))
+                     opts)
+        dir-name (:dir-name final-opts)
+        runnote-dir (str (fs/path project-root dir-name))]
+
+    (println "")
+    (println "Initializing RunNotes...")
+    (println "")
+
+    ;; Create RunNotes directory
+    (create-runnote-directory runnote-dir)
+
+    ;; Create project config if requested
+    (when (:create-config final-opts)
+      (create-project-config project-root project-name dir-name))
+
+    ;; Create README if requested
+    (when (:create-readme final-opts)
+      (create-readme runnote-dir project-name))
+
+    (println "")
+    (println "✅ RunNotes initialization complete!")
+    (println "")
+    (println "Next steps:")
+    (println (str "  1. Edit " (fs/path project-root ".runnote.edn") " to configure project settings"))
+    (println "  2. Create your first RunNotes session:")
+    (println (str "     cd " project-root))
+    (println "     runnote-launch research YourTopic")
+    (println "")))
+
+(when (= *file* (System/getProperty "babashka.file"))
+  (apply main *command-line-args*))
