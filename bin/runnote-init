@@ -108,9 +108,7 @@
                             "- **research**: Investigation and discovery\n"
                             "- **planning**: Architecture and approach decisions\n"
                             "- **implementation**: Active development work\n"
-                            "- **review**: Retrospective and analysis\n\n"
-                            "## Documentation\n\n"
-                            "See https://docs.claude.com/claude-code for full RunNotes documentation.\n")]
+                            "- **review**: Retrospective and analysis\n\n")]
     (if (fs/exists? readme-path)
       (println (str "⚠ README already exists: " readme-path))
       (do

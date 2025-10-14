@@ -365,7 +365,7 @@ Before transitioning:
 
 ## AI Integration (Claude Code)
 
-RunNotes is designed for AI-assisted development. See `doc/CLAUDE.md` for:
+RunNotes is designed for AI-assisted development. See `~/.runnote/CLAUDE.md` for:
 
 - Phase-specific AI behaviors
 - Quality enforcement standards
