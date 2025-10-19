@@ -6,36 +6,88 @@ RunNotes is a structured system for capturing development knowledge in real-time
 
 ### Installation
 
-1. Clone this repository to `~/.runnote`:
+#### Quick Install (Recommended)
 
-   ```bash
-   git clone <repo-url> ~/.runnote
-   ```
+Install the latest release with a single command:
 
-2. Add `~/.runnote/bin` to your PATH:
+```bash
+curl -sL https://github.com/rriehle/.runnote/releases/latest/download/install.sh | bash
+```
 
-   ```bash
-   # For bash
-   echo 'export PATH="$HOME/.runnote/bin:$PATH"' >> ~/.bashrc
-   source ~/.bashrc
+Add to your PATH:
 
-   # For zsh
-   echo 'export PATH="$HOME/.runnote/bin:$PATH"' >> ~/.zshrc
-   source ~/.zshrc
-   ```
+```bash
+# For bash
+echo 'export PATH="$HOME/.runnote/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
 
-3. **Initialize in your project**:
+# For zsh
+echo 'export PATH="$HOME/.runnote/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+#### Manual Install from Release
+
+Download and extract a specific version:
+
+```bash
+# Replace v1.0.0 with desired version
+curl -sL https://github.com/rriehle/.runnote/releases/download/v1.0.0/runnote-v1.0.0.tar.gz | tar xz
+mv runnote-v1.0.0 ~/.runnote
+echo 'export PATH="$HOME/.runnote/bin:$PATH"' >> ~/.bashrc  # or ~/.zshrc
+source ~/.bashrc  # or source ~/.zshrc
+```
+
+#### Development Install
+
+Clone the repository for the latest development version:
+
+```bash
+git clone https://github.com/rriehle/.runnote.git ~/.runnote
+echo 'export PATH="$HOME/.runnote/bin:$PATH"' >> ~/.bashrc  # or ~/.zshrc
+source ~/.bashrc  # or source ~/.zshrc
+```
+
+#### Prerequisites
+
+RunNotes requires [Babashka](https://babashka.org/). Install it before using RunNotes:
+
+```bash
+# macOS
+brew install borkdude/brew/babashka
+
+# Linux
+curl -sL https://raw.githubusercontent.com/babashka/babashka/master/install | bash
+```
+
+#### Getting Started
+
+1. **Initialize in your project**:
 
    ```bash
    cd your-project
    runnote-init
    ```
 
-4. **Create your first RunNotes session**:
+2. **Create your first RunNotes session**:
 
    ```bash
    runnote-launch research YourTopic
    ```
+
+#### CI/CD Usage
+
+Use RunNotes in GitHub Actions:
+
+```yaml
+- name: Install RunNotes
+  run: |
+    curl -sL https://github.com/rriehle/.runnote/releases/latest/download/install.sh | bash
+    echo "$HOME/.runnote/bin" >> $GITHUB_PATH
+
+- name: Search RunNotes
+  run: runnote-search summary
+```
 
 ## Core Concepts
 
