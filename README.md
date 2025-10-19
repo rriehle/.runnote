@@ -372,6 +372,44 @@ RunNotes is designed for AI-assisted development. See `~/.runnote/CLAUDE.md` for
 - ADR integration protocols
 - Workflow orchestration guidelines
 
+## Documentation
+
+### Quick Reference (AI Agents)
+
+**[CLAUDE.md](CLAUDE.md)** - Condensed quick reference for AI agents (~14k characters)
+
+### Detailed Documentation
+
+- **[doc/README-PHASES.md](doc/README-PHASES.md)** - Complete phase documentation including:
+  - Research Phase (objectives, patterns, responsibilities, transition criteria)
+  - Planning Phase (decision templates, estimation, risk mitigation)
+  - Implementation Phase (real-time logging, state management, failure documentation)
+  - Review Phase (metrics, DAKI analysis, pattern extraction)
+  - Specialized Phases (Debug, Hotfix, Performance, Security, Testing, Code Review)
+
+- **[doc/README-WORKFLOWS.md](doc/README-WORKFLOWS.md)** - Agent workflows including:
+  - Starting new sessions (pre-flight checks, initialization)
+  - Phase transitions (Research→Planning→Implementation→Review)
+  - Active session management (update frequency, state tracking, progress tracking)
+  - Session search and discovery (search strategies, pattern extraction, tag strategy)
+
+- **[doc/README-INTEGRATION.md](doc/README-INTEGRATION.md)** - Integration patterns with:
+  - ADR Tools (identifying candidates, linking, workflows)
+  - Requirements Tools (eliciting requirements, linking implementation)
+  - Code and Tests (linking code to RunNotes, test strategy documentation)
+
+- **[doc/README-QUALITY.md](doc/README-QUALITY.md)** - Quality enforcement including:
+  - Documentation quality standards (timestamps, state indicators, code snippets, metrics)
+  - Failure documentation standards (hypothesis, time, failure mode, root cause, prevention)
+  - Phase discipline (don't skip planning, update regularly, complete review)
+  - Common pitfalls (skipping phases, retroactive documentation, vague descriptions)
+
+- **[doc/README-FILE-FORMAT.md](doc/README-FILE-FORMAT.md)** - File format specifications:
+  - File naming convention (format, examples, rules, standard phases)
+  - EDN metadata structure (required/optional fields, related documents)
+  - EDN syntax quick reference (maps, keywords, strings, sets)
+  - Template reference (customization, hierarchy, available templates)
+
 ## Troubleshooting
 
 ### RunNotes directory not found
