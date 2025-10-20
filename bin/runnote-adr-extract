@@ -1,0 +1,299 @@
+#!/usr/bin/env bb
+
+;; clj-kondo config:
+;; {:linters {:redefined-var {:exclude [user/-main]}
+;;            :duplicate-require {:level :off}
+;;            :namespace-name-mismatch {:level :off}}}
+
+(ns runnote-adr-extract
+  (:require [clojure.string :as str]
+            [babashka.fs :as fs]))
+
+(defn get-config
+  "Get configuration with environment variable support.
+  Environment variables:
+  - RUNNOTES_DIR: Directory containing RunNotes files (default: runnotes)
+  - ADR_DIR: Directory for Architecture Decision Records (default: docs/architecture/decisions)"
+  []
+  {:runnotes-dir (or (System/getenv "RUNNOTES_DIR") "runnotes")
+   :adr-dir (or (System/getenv "ADR_DIR") "docs/architecture/decisions")})
+
+(defn extract-metadata
+  "Extract metadata from RunNotes content"
+  [content]
+  (let [lines (str/split-lines content)
+        extract-field (fn [field-name]
+                       (some #(when (str/includes? % (str "> **" field-name "**:"))
+                               (str/trim (second (str/split % #":"))))
+                            lines))]
+    {:phase (extract-field "Phase")
+     :tags (extract-field "Tags")}))
+
+(defn extract-adr-sections
+  "Extract ADR-related sections from RunNotes"
+  [content]
+  (let [;; Look for Architecture Decisions section
+        arch-decisions (re-find #"(?s)### Architecture Decisions.*?(?=\n##|\z)" content)
+        ;; Look for individual ADR entries
+        adr-pattern #"(?s)\d+\.\s+\*\*([^*]+)\*\*:(.*?)(?=\n\d+\.|$)"
+        adrs (when arch-decisions
+               (re-seq adr-pattern arch-decisions))
+        ;; Look for decision-like patterns in content
+        decision-patterns ["We decided to" "Decision:" "Approach:" "We will use" "Architecture:"]
+        decisions (mapcat (fn [pattern]
+                           (re-seq (re-pattern (str "(?i)" pattern ".*")) content))
+                         decision-patterns)]
+    {:explicit-adrs (map (fn [[_ title content]]
+                          {:title (str/trim title)
+                           :content (str/trim content)})
+                        adrs)
+     :implicit-decisions (distinct decisions)}))
+
+(defn parse-adr-content
+  "Parse ADR content into structured format"
+  [adr-text]
+  (let [lines (str/split-lines adr-text)
+        context-idx (first (keep-indexed #(when (str/includes? %2 "Context:") %1) lines))
+        decision-idx (first (keep-indexed #(when (str/includes? %2 "Decision:") %1) lines))
+        consequences-idx (first (keep-indexed #(when (str/includes? %2 "Consequences:") %1) lines))]
+    {:context (when context-idx
+               (str/trim (subs (nth lines context-idx) 
+                              (+ (.indexOf (nth lines context-idx) ":") 1))))
+     :decision (when decision-idx
+                (str/trim (subs (nth lines decision-idx)
+                               (+ (.indexOf (nth lines decision-idx) ":") 1))))
+     :consequences (when consequences-idx
+                    (str/trim (str/join " " 
+                                      (take-while #(not (str/starts-with? % "-"))
+                                                 (drop (inc consequences-idx) lines)))))}))
+
+(defn next-adr-number
+  "Get the next ADR number"
+  [config]
+  (let [existing-adrs (fs/glob (:adr-dir config) "[0-9]*.md")
+        numbers (map #(Integer/parseInt (re-find #"\d{5}" (str %))) existing-adrs)]
+    (format "%05d" (inc (apply max 0 numbers)))))
+
+(defn generate-adr-content
+  "Generate ADR content in standard format"
+  [title context decision consequences tags source-file date]
+  (str "# " title "\n\n"
+       "Date: " date "\n\n"
+       "## Status\n\n"
+       "Proposed\n\n"
+       "## Tags\n\n"
+       tags "\n\n"
+       "## Context\n\n"
+       context "\n\n"
+       "## Decision\n\n"
+       decision "\n\n"
+       "## Consequences\n\n"
+       "### Positive\n\n"
+       "- " (if (string? consequences) 
+             consequences 
+             "To be determined") "\n\n"
+       "### Negative\n\n"
+       "- To be determined\n\n"
+       "### Neutral\n\n"
+       "- To be determined\n\n"
+       "## Links\n\n"
+       "- RunNotes: " source-file "\n"))
+
+(defn extract-from-file
+  "Extract ADR candidates from a single RunNotes file"
+  [file]
+  (let [content (slurp (str file))
+        metadata (extract-metadata content)
+        phase (when (:phase metadata)
+               (str/lower-case (first (str/split (:phase metadata) #" "))))]
+    (when (= phase "planning")
+      (let [sections (extract-adr-sections content)
+            filename (fs/file-name file)
+            date (str/join "-" (take 3 (drop 1 (str/split filename #"-"))))]
+        {:file file
+         :date date
+         :tags (:tags metadata)
+         :explicit-adrs (:explicit-adrs sections)
+         :implicit-decisions (:implicit-decisions sections)}))))
+
+(defn format-adr-candidates
+  "Format ADR candidates for display"
+  [candidates]
+  (doseq [candidate candidates]
+    (println "\n📄" (fs/file-name (:file candidate)))
+    (println "   Date:" (:date candidate))
+    (when (:tags candidate)
+      (println "   Tags:" (:tags candidate)))
+    (when (seq (:explicit-adrs candidate))
+      (println "\n   Explicit ADRs found:")
+      (doseq [adr (:explicit-adrs candidate)]
+        (println "   - Title:" (:title adr))
+        (println "     Content:" (str/replace (:content adr) #"\n" "\n     "))))
+    (when (seq (:implicit-decisions candidate))
+      (println "\n   Implicit decisions found:")
+      (doseq [decision (:implicit-decisions candidate)]
+        (println "   -" (str/trim decision))))))
+
+(defn create-adr-draft
+  "Create a draft ADR file"
+  [config title context decision consequences tags source-file]
+  (let [adr-number (next-adr-number config)
+        safe-title (-> title
+                      (str/lower-case)
+                      (str/replace #"[^a-z0-9]+" "-")
+                      (str/replace #"-+$" ""))
+        filename (str (:adr-dir config) "/" adr-number "-" safe-title ".md")
+        date (.format (java.time.LocalDate/now)
+                     java.time.format.DateTimeFormatter/ISO_LOCAL_DATE)
+        content (generate-adr-content title context decision consequences
+                                    tags source-file date)]
+    (fs/create-dirs (:adr-dir config))
+    (spit filename content)
+    {:filename filename
+     :number adr-number
+     :title title}))
+
+(defn interactive-adr-creation
+  "Interactive mode for creating ADRs from candidates"
+  [config candidates]
+  (println "\n🔍 ADR Extraction - Interactive Mode")
+  (println "=====================================")
+
+  (doseq [candidate candidates
+          adr (:explicit-adrs candidate)]
+    (println "\n📋 Found ADR candidate:")
+    (println "   Title:" (:title adr))
+    (println "   From:" (fs/file-name (:file candidate)))
+    (println "   Content:" (str/replace (:content adr) #"\n" "\n   "))
+    (println "\nCreate ADR? (y/n/q to quit):")
+
+    (let [response (read-line)]
+      (case response
+        "y" (let [parsed (parse-adr-content (:content adr))
+                  result (create-adr-draft
+                          config
+                          (:title adr)
+                          (or (:context parsed) "See RunNotes for context")
+                          (or (:decision parsed) (:content adr))
+                          (:consequences parsed)
+                          (or (:tags candidate) ":architecture")
+                          (str (:file candidate)))]
+              (println "✅ Created" (:filename result)))
+        "q" (do (println "Exiting...") (System/exit 0))
+        (println "Skipped")))))
+
+(defn batch-extract
+  "Batch extract all ADR candidates"
+  [config args]
+  (let [files (fs/glob (:runnotes-dir config) "RunNotes-*-planning.md")
+        all-candidates (filter some? (map extract-from-file files))
+        candidates-with-adrs (filter #(seq (:explicit-adrs %)) all-candidates)]
+    (if (empty? candidates-with-adrs)
+      (println "No ADR candidates found in planning files")
+      (do
+        (println "Found" (reduce + (map #(count (:explicit-adrs %)) candidates-with-adrs))
+                "ADR candidates in" (count candidates-with-adrs) "files")
+        (if (= (first args) "--create")
+          (interactive-adr-creation config candidates-with-adrs)
+          (format-adr-candidates candidates-with-adrs))))))
+
+(defn analyze-file
+  "Analyze a specific file for ADR candidates"
+  [file]
+  (if-not (fs/exists? file)
+    (println "Error: File" file "not found")
+    (let [candidate (extract-from-file file)]
+      (if (or (seq (:explicit-adrs candidate))
+             (seq (:implicit-decisions candidate)))
+        (format-adr-candidates [candidate])
+        (println "No ADR candidates found in" file)))))
+
+(defn print-usage []
+  (println "RunNotes ADR Extraction Tool")
+  (println "")
+  (println "Usage:")
+  (println "  ./ci/runnotes-adr-extract.bb scan                - Scan all planning files for ADR candidates")
+  (println "  ./ci/runnotes-adr-extract.bb scan --create       - Interactive ADR creation from candidates")
+  (println "  ./ci/runnotes-adr-extract.bb analyze <file>      - Analyze specific file for ADRs")
+  (println "  ./ci/runnotes-adr-extract.bb list                - List existing ADRs")
+  (println "")
+  (println "Configuration:")
+  (println "  --runnotes-dir <path>    - Override RunNotes directory (default: runnotes)")
+  (println "  --adr-dir <path>         - Override ADR directory (default: docs/architecture/decisions)")
+  (println "")
+  (println "Environment Variables:")
+  (println "  RUNNOTES_DIR             - RunNotes directory")
+  (println "  ADR_DIR                  - ADR directory")
+  (println "")
+  (println "Examples:")
+  (println "  ./ci/runnotes-adr-extract.bb scan")
+  (println "  ./ci/runnotes-adr-extract.bb scan --create")
+  (println "  ./ci/runnotes-adr-extract.bb analyze runnotes/RunNotes-2025-06-29-Feature-planning.md")
+  (println "  ./ci/runnotes-adr-extract.bb --runnotes-dir ~/notes --adr-dir ~/docs/adr scan")
+  (println "  RUNNOTES_DIR=~/notes ADR_DIR=~/docs/adr ./ci/runnotes-adr-extract.bb scan"))
+
+(defn list-adrs
+  "List existing ADRs"
+  [config]
+  (let [adrs (sort (fs/glob (:adr-dir config) "[0-9]*.md"))]
+    (if (empty? adrs)
+      (println "No ADRs found")
+      (do
+        (println "\n📚 Existing ADRs:")
+        (doseq [adr adrs]
+          (let [content (slurp (str adr))
+                title (re-find #"(?m)^# (.+)$" content)
+                status (re-find #"(?m)^## Status\n\n(.+)$" content)]
+            (println (format "\n%s - %s"
+                           (fs/file-name adr)
+                           (or (second title) "Untitled")))
+            (when status
+              (println "   Status:" (second status)))))))))
+
+(defn parse-args
+  "Parse command-line arguments and merge with default config.
+  Supports --runnotes-dir and --adr-dir flags."
+  [args default-config]
+  (loop [remaining args
+         config default-config
+         command nil
+         cmd-args []]
+    (if (empty? remaining)
+      {:config config :command command :args cmd-args}
+      (let [arg (first remaining)
+            rest-args (rest remaining)]
+        (case arg
+          "--runnotes-dir" (if (seq rest-args)
+                            (recur (rest rest-args)
+                                   (assoc config :runnotes-dir (first rest-args))
+                                   command
+                                   cmd-args)
+                            (do (println "Error: --runnotes-dir requires a value")
+                                (System/exit 1)))
+          "--adr-dir" (if (seq rest-args)
+                       (recur (rest rest-args)
+                              (assoc config :adr-dir (first rest-args))
+                              command
+                              cmd-args)
+                       (do (println "Error: --adr-dir requires a value")
+                           (System/exit 1)))
+          (if (nil? command)
+            (recur rest-args config arg cmd-args)
+            (recur rest-args config command (conj cmd-args arg))))))))
+
+(defn -main [& args]
+  (if (empty? args)
+    (print-usage)
+    (let [default-config (get-config)
+          {:keys [config command args]} (parse-args args default-config)]
+      (case command
+        "scan" (batch-extract config args)
+        "analyze" (if-let [file (first args)]
+                   (analyze-file file)
+                   (println "Please specify a file to analyze"))
+        "list" (list-adrs config)
+        (do (println "Unknown command:" command)
+            (print-usage))))))
+
+(when (= *file* (System/getProperty "babashka.file"))
+  (apply -main *command-line-args*))
