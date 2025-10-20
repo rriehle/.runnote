@@ -63,6 +63,27 @@ check_prerequisites() {
   fi
 }
 
+# Check .lib dependency
+check_lib_dependency() {
+  if [ ! -d "$HOME/.lib" ]; then
+    error "Dependency not found: ~/.lib is required
+
+Install it first:
+  curl -sL https://github.com/rriehle/.lib/releases/latest/download/install.sh | bash"
+  fi
+
+  if [ ! -f "$HOME/.lib/config-core.bb" ] || [ ! -f "$HOME/.lib/metadata-parser.bb" ]; then
+    error "~/.lib installation incomplete (missing required libraries)"
+  fi
+
+  if [ -f "$HOME/.lib/VERSION" ]; then
+    LIB_VERSION=$(cat "$HOME/.lib/VERSION")
+    info "Found .lib dependency: ${LIB_VERSION}"
+  else
+    warn ".lib installation missing VERSION file (may be from git clone)"
+  fi
+}
+
 # Determine download URL
 get_download_url() {
   if [ "$VERSION" = "latest" ]; then
@@ -163,6 +184,7 @@ main() {
   echo ""
 
   check_prerequisites
+  check_lib_dependency
 
   local download_url
   download_url=$(get_download_url)
