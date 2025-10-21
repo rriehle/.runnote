@@ -1,0 +1,238 @@
+#!/usr/bin/env bb
+
+;; clj-kondo config:
+;; {:linters {:redefined-var {:exclude [user/-main]}
+;;            :duplicate-require {:level :off}}}
+
+(ns ^:clj-kondo/ignore runnote-validate
+  "RunNotes validation tool - format compliance and metadata checking.
+   Uses shared config-core and metadata-parser libraries."
+  (:require [clojure.string :as str]
+            [babashka.fs :as fs]))
+
+;; Load shared libraries from ~/.lib/
+(def lib-dir (str (System/getenv "HOME") "/.lib"))
+(load-file (str lib-dir "/config-core.bb"))
+(load-file (str lib-dir "/metadata-parser.bb"))
+
+(def parse-metadata (:parse-metadata metadata-parser/exports))
+(def extract-edn-metadata (:extract-edn-metadata metadata-parser/exports))
+
+;; Configuration resolution (3-tier: CLI → ENV → Config → Default)
+(defn get-runnote-dir
+  "Get RunNotes directory with 3-tier resolution.
+   Priority: CLI args → RUNNOTE_DIR env → config file → default 'runnotes'"
+  ([]
+   (get-runnote-dir nil))
+  ([cli-override]
+   (or cli-override
+       (System/getenv "RUNNOTE_DIR")
+       (try
+         (let [config (config-core/load-config :runnote)]
+           (config-core/resolve-runnote-dir config))
+         (catch Exception _e
+           "runnotes"))
+       "runnotes")))
+
+(defn validate-filename
+  "Validate RunNotes filename convention"
+  [file]
+  (let [filename (fs/file-name file)
+        pattern #"^RunNotes-\d{4}-\d{2}-\d{2}-[A-Za-z]+(-[a-z]+)?\.md$"]
+    (if (re-matches pattern filename)
+      {:valid true}
+      {:valid false
+       :error (str "Invalid filename format: " filename
+                   "\nExpected: RunNotes-YYYY-MM-DD-TopicName-phase.md")})))
+
+(defn validate-required-fields
+  "Check for required metadata fields using EDN parser"
+  [content]
+  (let [result (parse-metadata content :runnotes)]
+    (if (:valid result)
+      {:valid true}
+      {:valid false
+       :error (str "Invalid metadata: " (or (:explanation result)
+                                            "Missing or malformed EDN metadata block"))})))
+
+(defn validate-tags
+  "Validate tags are present and properly formatted"
+  [content]
+  (let [metadata (extract-edn-metadata content)]
+    (if-let [tags (:tag metadata)]
+      (if (and (set? tags) (every? keyword? tags))
+        {:valid true}
+        {:valid false :error "Tags must be a set of keywords"})
+      {:valid false :error "Tags field not found in metadata"})))
+
+(defn validate-phase-structure
+  "Validate phase-specific structure"
+  [content phase]
+  (let [required-sections (case (str/lower-case phase)
+                            "research" ["Research Questions" "Investigation Approach"
+                                        "Findings Log" "Phase Transition Checklist"]
+                            "planning" ["Context From Research" "Solution Design"
+                                        "Implementation Strategy" "Phase Transition Checklist"]
+                            "implementation" ["Implementation Plan" "Progress Tracker"
+                                              "Active Work Log"]
+                            "review" ["Objectives vs. Outcomes" "Metrics Summary"
+                                      "What Worked Well" "Next Actions"]
+                            [])
+        missing-sections (filter (fn [section]
+                                   (not (str/includes? content (str "## " section))))
+                                 required-sections)]
+    (if (empty? missing-sections)
+      {:valid true}
+      {:valid false
+       :error (str "Missing required sections for " phase " phase: "
+                   (str/join ", " missing-sections))})))
+
+(defn validate-file
+  "Perform all validations on a single file"
+  [file]
+  (let [filename-check (validate-filename file)]
+    (if-not (:valid filename-check)
+      (assoc filename-check :file file)
+      (let [content (slurp (str file))
+            metadata (extract-edn-metadata content)
+            phase (:phase metadata)
+
+            checks [(validate-required-fields content)
+                    (validate-tags content)
+                    (when phase (validate-phase-structure content phase))]
+            failed-checks (filter #(and % (not (:valid %))) checks)]
+        (if (empty? failed-checks)
+          {:file file :valid true}
+          {:file file
+           :valid false
+           :errors (map :error failed-checks)})))))
+
+(defn check-all
+  "Validate all RunNotes files in the configured directory"
+  [runnotes-dir]
+  (let [files (fs/glob runnotes-dir "RunNotes-*.md")
+        results (map validate-file files)
+        invalid (filter #(not (:valid %)) results)]
+    {:total (count files)
+     :valid (count (filter :valid results))
+     :invalid (count invalid)
+     :errors invalid}))
+
+(defn check-time-budget
+  "Check for deprecated Time Budget field"
+  [runnotes-dir]
+  (let [files (fs/glob runnotes-dir "RunNotes-*.md")
+        with-time-budget (filter (fn [file]
+                                   (str/includes? (slurp (str file)) "Time Budget"))
+                                 files)]
+    (if (empty? with-time-budget)
+      {:found 0 :files []}
+      {:found (count with-time-budget)
+       :files (map fs/file-name with-time-budget)})))
+
+(defn format-report
+  "Format validation results for display"
+  [results runnotes-dir]
+  (println "\n📋 RunNotes Validation Report")
+  (println "===========================")
+  (println "Directory:" runnotes-dir)
+  (println "Total files:" (:total results))
+  (println "✅ Valid:" (:valid results))
+  (println "❌ Invalid:" (:invalid results))
+
+  (when (pos? (:invalid results))
+    (println "\nValidation Errors:")
+    (doseq [error (:errors results)]
+      (println "\n📄" (fs/file-name (:file error)))
+      (if (string? (:errors error))
+        (println "  " (:errors error))
+        (doseq [e (:errors error)]
+          (println "  -" e)))))
+
+  (let [time-budget-check (check-time-budget runnotes-dir)]
+    (when (pos? (:found time-budget-check))
+      (println "\n⚠️  Files with deprecated Time Budget field:")
+      (doseq [file (:files time-budget-check)]
+        (println "  " file)))))
+
+(defn print-usage []
+  (println "RunNotes Validation Tool")
+  (println "")
+  (println "Usage:")
+  (println "  runnote-validate [--dir <path>] check-all         - Validate all RunNotes")
+  (println "  runnote-validate [--dir <path>] check <file>      - Validate specific file")
+  (println "  runnote-validate [--dir <path>] report            - Generate validation report")
+  (println "  runnote-validate [--dir <path>] check-deprecated  - Find deprecated fields")
+  (println "")
+  (println "Configuration (3-tier precedence):")
+  (println "  1. CLI: --dir /path/to/runnotes")
+  (println "  2. ENV: RUNNOTE_DIR=/path/to/runnotes")
+  (println "  3. Config: ~/.runnote/config.edn {:runnote {:root-dir \"/path\"}}")
+  (println "  4. Default: ./runnotes")
+  (println "")
+  (println "Examples:")
+  (println "  runnote-validate check-all")
+  (println "  runnote-validate --dir /custom/path check-all")
+  (println "  RUNNOTE_DIR=./notes runnote-validate check-all")
+  (println "  runnote-validate check runnotes/RunNotes-2025-06-29-Feature-research.md"))
+
+(defn parse-args
+  "Parse command line arguments with --dir support"
+  [args]
+  (loop [remaining args
+         parsed {:command nil :args [] :dir nil}]
+    (if (empty? remaining)
+      parsed
+      (let [current (first remaining)
+            next-args (rest remaining)]
+        (cond
+          (= current "--dir")
+          (recur (rest next-args)
+                 (assoc parsed :dir (first next-args)))
+
+          (nil? (:command parsed))
+          (recur next-args
+                 (assoc parsed :command current))
+
+          :else
+          (recur next-args
+                 (update parsed :args conj current)))))))
+
+(defn -main [& args]
+  (if (empty? args)
+    (print-usage)
+    (let [{:keys [command args dir]} (parse-args args)
+          runnotes-dir (get-runnote-dir dir)]
+      (case command
+        "check-all" (let [results (check-all runnotes-dir)]
+                      (format-report results runnotes-dir)
+                      (when (pos? (:invalid results))
+                        (System/exit 1)))
+
+        "check" (if-let [file (first args)]
+                  (let [result (validate-file file)]
+                    (if (:valid result)
+                      (println "✅" (fs/file-name file) "is valid")
+                      (do (println "❌" (fs/file-name file) "has errors:")
+                          (if (string? (:errors result))
+                            (println "  " (:errors result))
+                            (doseq [e (:errors result)]
+                              (println "  -" e)))
+                          (System/exit 1))))
+                  (println "Please specify a file to check"))
+
+        "report" (format-report (check-all runnotes-dir) runnotes-dir)
+
+        "check-deprecated" (let [result (check-time-budget runnotes-dir)]
+                             (if (zero? (:found result))
+                               (println "✅ No files found with deprecated Time Budget field")
+                               (do (println "Found" (:found result)
+                                            "files with deprecated Time Budget field:")
+                                   (doseq [file (:files result)]
+                                     (println "  " file)))))
+
+        (do (println "Unknown command:" command)
+            (print-usage))))))
+
+(when (= *file* (System/getProperty "babashka.file"))
+  (apply -main *command-line-args*))

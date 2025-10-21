@@ -1,0 +1,542 @@
+#!/usr/bin/env bb
+
+;; clj-kondo config:
+;; {:linters {:redefined-var {:exclude [user/-main]}
+;;            :duplicate-require {:level :off}}}
+
+(ns ^:clj-kondo/ignore runnote-transition
+  "RunNotes transition manager - phase transitions and workflow orchestration.
+   Uses shared config-core and metadata-parser libraries."
+  (:require [clojure.string :as str]
+            [clojure.java.io :as io]
+            [babashka.fs :as fs]
+            [clojure.edn :as edn]))
+
+;; Load shared libraries from ~/.lib/
+(def lib-dir (str (System/getenv "HOME") "/.lib"))
+(load-file (str lib-dir "/config-core.bb"))
+(load-file (str lib-dir "/metadata-parser.bb"))
+
+(def extract-edn-metadata (:extract-edn-metadata metadata-parser/exports))
+
+;; Configuration resolution (3-tier: CLI → ENV → Config → Default)
+(defn get-runnote-dir
+  "Get RunNotes directory with 3-tier resolution.
+   Priority: CLI args → RUNNOTE_DIR env → config file → default 'runnotes'"
+  ([]
+   (get-runnote-dir nil))
+  ([cli-override]
+   (or cli-override
+       (System/getenv "RUNNOTE_DIR")
+       (try
+         (let [config (config-core/load-config :runnote)]
+           (config-core/resolve-runnote-dir config))
+         (catch Exception _e
+           "runnotes"))
+       "runnotes")))
+(defn extract-metadata
+  "Extract metadata from RunNotes markdown content"
+  [content]
+  ;; Try EDN metadata first
+  (if-let [edn-metadata (extract-edn-metadata content)]
+    ;; Convert EDN format to expected format
+    {:phase (:phase edn-metadata)
+     :tags (when-let [tags (:tag edn-metadata)]
+             (str/join " " (map #(str ":" (name %)) tags)))
+     :thinking-mode (:thinking-mode edn-metadata)
+     :state (:status edn-metadata)
+     :session-type (:session-type edn-metadata)
+     :parent (:parent edn-metadata)}
+    ;; Fall back to old format
+    (let [lines (str/split-lines content)
+          extract-field (fn [field-name]
+                         (some #(when (str/includes? % (str "> **" field-name "**:"))
+                                 (str/trim (second (str/split % #":"))))
+                              lines))]
+      {:phase (extract-field "Phase")
+       :tags (extract-field "Tags")
+       :thinking-mode (extract-field "Thinking Mode")
+       :state (extract-field "Current State")
+       :session-type (extract-field "Session Type")
+       :parent (extract-field "Parent RunNote")})))
+
+(defn validate-checklist
+  "Check if phase transition checklist is complete"
+  [content phase]
+  (let [checklist-section (re-find #"(?s)## Phase Transition Checklist.*?(?=\n##|\z)" content)
+        unchecked-items (when checklist-section
+                         (re-seq #"- \[ \]" checklist-section))]
+    (if (empty? unchecked-items)
+      {:valid true}
+      {:valid false
+       :unchecked (count unchecked-items)
+       :message (str "Found " (count unchecked-items) " unchecked items in transition checklist")})))
+
+(defn extract-context
+  "Extract key context to carry forward to next phase"
+  [content phase]
+  (case phase
+    "research" {:research-questions (re-find #"(?s)## Research Questions.*?(?=\n##)" content)
+                :constraints (re-find #"(?s)## Constraints Identified.*?(?=\n##)" content)
+                :open-questions (re-find #"(?s)## Open Questions.*?(?=\n##)" content)
+                :key-findings (re-find #"(?s)## Key Findings.*?(?=\n##)" content)
+                :risks (re-find #"(?s)## Risks.*?(?=\n##)" content)}
+    "planning" {:selected-approach (re-find #"(?s)### Selected Approach:.*?(?=\n###|\n##)" content)
+                :architecture-decisions (re-find #"(?s)### Architecture Decisions.*?(?=\n##)" content)
+                :implementation-strategy (re-find #"(?s)## Implementation Strategy.*?(?=\n##)" content)
+                :success-criteria (re-find #"(?s)## Success Criteria.*?(?=\n##)" content)
+                :time-estimates (re-find #"(?s)## Phase Breakdown.*?(?=\n##)" content)}
+    "implementation" {:progress (re-find #"(?s)## Progress Tracker.*?(?=\n##)" content)
+                      :work-log (re-find #"(?s)## Active Work Log.*?(?=\n##)" content)
+                      :blocked-items (re-seq #"(?s)### 🔴 BLOCKED.*?(?=\n###|\n##)" content)
+                      :completed-items (re-seq #"- \[x\].*" content)
+                      :architecture-checkpoint (re-find #"(?s)## Architecture Checkpoint.*?(?=\n##)" content)}
+    {}))
+
+(defn extract-blocked-items
+  "Extract blocked items from implementation content"
+  [content]
+  (let [blocked-pattern #"(?s)### 🔴 BLOCKED - ([^\n]+)\n\*\*Blocking Issue\*\*: ([^\n]+)"
+        blocked-items (re-seq blocked-pattern content)]
+    (map (fn [[_ title issue]]
+           {:title (str/trim title)
+            :issue (str/trim issue)})
+         blocked-items)))
+
+(defn next-phase
+  "Determine the next phase in sequence"
+  [current-phase]
+  (case current-phase
+    "research" "planning"
+    "planning" "implementation"
+    "implementation" "review"
+    "review" nil))
+
+
+(defn determine-sub-mode-number
+  "Determine the next number for a sub-mode session"
+  [parent-file sub-mode-type runnotes-dir]
+  (let [parent-name (fs/file-name parent-file)
+        topic (second (str/split parent-name #"-"))
+        pattern (str "*" topic (str/capitalize sub-mode-type) "*")
+        existing (fs/glob runnotes-dir pattern)]
+    (inc (count existing))))
+
+(defn create-sub-mode-file
+  "Create a sub-mode session file (debug, testing, performance, security)"
+  [parent-file sub-mode-type title context runnotes-dir]
+  (let [parent-content (slurp (str parent-file))
+        parent-metadata (extract-metadata parent-content)
+        parent-name (fs/file-name parent-file)
+        topic (second (str/split parent-name #"-"))
+        date (str/join "-" (take 3 (drop 1 (str/split parent-name #"-"))))
+        sub-number (determine-sub-mode-number parent-file sub-mode-type runnotes-dir)
+        sub-file (str runnotes-dir "/RunNotes-" date "-" topic 
+                     (str/capitalize sub-mode-type)
+                     (format "%02d" sub-number) "-research.md")
+        template-file (str runnotes-dir "/template-" sub-mode-type ".md")]
+    (if (fs/exists? template-file)
+      (let [template (slurp template-file)
+            now (.format (java.time.LocalDateTime/now) 
+                        (java.time.format.DateTimeFormatter/ofPattern "yyyy-MM-dd HH:mm"))
+            customized (-> template
+                          (str/replace "YYYY-MM-DD HH:MM" now)
+                          (str/replace "[Link to parent RunNote if spawned from blocked state]" 
+                                      parent-file)
+                          (str/replace "[Link to parent RunNote]" parent-file)
+                          (str/replace "[inherit parent tags]" 
+                                      (str (:tags parent-metadata)))
+                          (str/replace "[01, 02, etc. if multiple debug sessions]" 
+                                      (format "%02d" sub-number))
+                          (str/replace "[Issue]" (or (:issue context) title))
+                          (str/replace "[Issue Description]" (or (:issue context) title))
+                          (str/replace "[Component/Operation]" title)
+                          (str/replace "[Feature/Component]" title)
+                          (str/replace "[Component/Vulnerability]" title)
+                          (str/replace "[Initial hypothesis]" 
+                                      (or (:hypothesis context) "See parent RunNote")))]
+        (spit sub-file customized)
+        {:success true :file sub-file :number sub-number})
+      {:success false :error (str "template-" sub-mode-type ".md not found")})))
+
+(defn create-phase-file
+  "Create new RunNotes file for next phase"
+  [topic date current-phase context metadata runnotes-dir]
+  (let [next-ph (next-phase current-phase)
+        filename (str runnotes-dir "/RunNotes-" date "-" topic "-" next-ph ".md")
+        template-file (str runnotes-dir "/template-" next-ph ".md")
+        template (if (fs/exists? template-file)
+                  (slurp template-file)
+                  (str "# " (str/capitalize next-ph) ": " topic " - " date "\n\n"
+                       "> **Phase**: " (str/capitalize next-ph) "\n"
+                       "> **Previous Phase**: " (str/capitalize current-phase) " (Completed: " date ")\n"
+                       "> **Tags**: " (:tags metadata) "\n\n"
+                       "## Context From Previous Phase\n\n"
+                       (pr-str context)))]
+    (spit filename template)
+    filename))
+(defn analyze-work-patterns
+  "Analyze work patterns from work log entries"
+  [content]
+  (let [time-pattern #"### (\d{2}:\d{2})"
+        work-entries (re-seq #"(?s)### \d{2}:\d{2}.*?(?=\n###|\n##|\z)" content)
+        times (map #(second (re-find time-pattern %)) work-entries)]
+    {:total-entries (count work-entries)
+     :time-span (when (>= (count times) 2)
+                 (str (first times) " - " (last times)))
+     :states (frequencies (map #(cond
+                                (str/includes? % "🟢") "Active"
+                                (str/includes? % "🟡") "Investigating"
+                                (str/includes? % "🔴") "Blocked"
+                                :else "Unknown")
+                              work-entries))}))
+
+(defn extract-all-context
+  "Extract comprehensive context from a RunNotes file"
+  [file]
+  (let [content (slurp (str file))
+        metadata (extract-metadata content)
+        phase (str/lower-case (first (str/split (:phase metadata) #" ")))
+        base-context (extract-context content phase)]
+    (merge {:file file
+            :metadata metadata
+            :phase phase}
+           base-context
+           (when (= phase "implementation")
+             {:work-patterns (analyze-work-patterns content)
+              :blocked-count (count (extract-blocked-items content))}))))
+
+(defn generate-transition-summary
+  "Generate a detailed transition summary"
+  [from-file to-phase]
+  (let [context (extract-all-context from-file)
+        phase (:phase context)]
+    (println "\n📋 Transition Summary")
+    (println "====================")
+    (println "From:" (fs/file-name from-file))
+    (println "Current Phase:" phase "→" to-phase)
+    (println "\n🎯 Key Context to Carry Forward:")
+    
+    (case phase
+      "research"
+      (do (when (:research-questions context)
+            (println "\n• Research Questions addressed"))
+          (when (:open-questions context)
+            (println "• Open questions requiring attention"))
+          (when (:risks context)
+            (println "• Identified risks"))
+          (when (:constraints context)
+            (println "• Constraints discovered")))
+      
+      "planning"
+      (do (when (:selected-approach context)
+            (println "\n• Selected approach documented"))
+          (when (:architecture-decisions context)
+            (println "• Architecture decisions made"))
+          (when (:success-criteria context)
+            (println "• Success criteria defined"))
+          (when (:time-estimates context)
+            (println "• Time estimates established")))
+      
+      "implementation"
+      (do (when-let [patterns (:work-patterns context)]
+            (println "\n• Work Statistics:")
+            (println "  - Total work entries:" (:total-entries patterns))
+            (println "  - Time span:" (:time-span patterns))
+            (when-let [states (:states patterns)]
+              (doseq [[state count] states]
+                (println (str "  - " state ": " count " entries")))))
+          (when (pos? (:blocked-count context 0))
+            (println "• ⚠️  Warning:" (:blocked-count context) "blocked items need resolution"))
+          (when (:completed-items context)
+            (println "• Completed items:" (count (:completed-items context)))))
+      
+      nil)))
+
+;; Commands
+
+(defn validate
+  "Validate phase transition readiness"
+  [args]
+  (let [[file next-phase] args]
+    (if-not (fs/exists? file)
+      (println "Error: File" file "not found")
+      (let [content (slurp (str file))
+            metadata (extract-metadata content)
+            validation (validate-checklist content (:phase metadata))]
+        (if (:valid validation)
+          (do (println "✅ Ready for transition to" next-phase)
+              (println "Current tags:" (:tags metadata)))
+          (do (println "❌ Not ready for transition")
+              (println (:message validation))))))))
+
+(defn transition
+  "Perform phase transition"
+  [args runnotes-dir]
+  (let [[file] args]
+    (if-not (fs/exists? file)
+      (println "Error: File" file "not found")
+      (let [content (slurp (str file))
+            metadata (extract-metadata content)
+            current-phase (str/lower-case (first (str/split (:phase metadata) #" ")))
+            validation (validate-checklist content current-phase)]
+        (if-not (:valid validation)
+          (println "Error: Transition checklist not complete." (:message validation))
+          (let [filename-parts (str/split (fs/file-name file) #"-")
+                date (str/join "-" (take 3 (drop 1 filename-parts)))
+                topic (nth filename-parts 4)
+                context (extract-context content current-phase)
+                new-file (create-phase-file topic date current-phase context metadata runnotes-dir)]
+            (println "✅ Created" new-file)
+            (println "Context extracted and transferred")
+            (println "Ready to begin" (next-phase current-phase) "phase")))))))
+
+(defn spawn-sub-mode
+  "Spawn a sub-mode session (debug, testing, performance, security)"
+  [args runnotes-dir]
+  (let [[parent-file sub-mode-type title & more] args]
+    (if-not (fs/exists? parent-file)
+      (println "Error: Parent file" parent-file "not found")
+      (if-not (contains? #{"debug" "testing" "performance" "security"} sub-mode-type)
+        (println "Error: Invalid sub-mode type. Must be: debug, testing, performance, or security")
+        (let [context (if (= sub-mode-type "debug")
+                       {:issue title :hypothesis (first more)}
+                       {:title title})
+              result (create-sub-mode-file parent-file sub-mode-type title context runnotes-dir)]
+          (if (:success result)
+            (do (println (str "🔧 " (str/capitalize sub-mode-type) " session spawned: " 
+                             (:file result)))
+                (println "Parent:" parent-file)
+                (println "Session:" title))
+            (println "Error:" (:error result))))))))
+
+(defn list-blocked
+  "List all blocked items across implementation files"
+  [args runnotes-dir]
+  (let [files (fs/glob runnotes-dir "RunNotes-*-implementation.md")
+        all-blocked (mapcat (fn [file]
+                             (let [content (slurp (str file))
+                                   blocked (extract-blocked-items content)]
+                               (map #(assoc % :file file) blocked)))
+                           files)]
+    (if (empty? all-blocked)
+      (println "No blocked items found")
+      (do (println "\n🔴 Blocked Items Across All Implementation Files")
+          (println "=" (apply str (repeat 50 "=")))
+          (doseq [item all-blocked]
+            (println "\n📄" (fs/file-name (:file item)))
+            (println "   Issue:" (:title item))
+            (println "   Reason:" (:issue item)))
+          (println "\nTotal blocked items:" (count all-blocked))))))
+
+(defn suggest-next
+  "Suggest next action based on current state"
+  [args]
+  (let [[file] args]
+    (if-not (fs/exists? file)
+      (println "Error: File" file "not found")
+      (let [content (slurp (str file))
+            metadata (extract-metadata content)
+            phase (str/lower-case (first (str/split (:phase metadata) #" ")))
+            state (:state metadata)
+            blocked-items (when (= phase "implementation")
+                           (extract-blocked-items content))
+            work-patterns (when (= phase "implementation")
+                           (analyze-work-patterns content))]
+        (println "\n📊 Current State Analysis")
+        (println "========================")
+        (println "File:" (fs/file-name file))
+        (println "Phase:" (:phase metadata))
+        (println "State:" (or state "Not specified"))
+        (println "Tags:" (:tags metadata))
+        
+        (when work-patterns
+          (println "\n📈 Work Pattern Analysis:")
+          (println "  Total entries:" (:total-entries work-patterns))
+          (when (:time-span work-patterns)
+            (println "  Time span:" (:time-span work-patterns)))
+          (when-let [states (:states work-patterns)]
+            (println "  State distribution:")
+            (doseq [[state count] states]
+              (println (str "    - " state ": " count)))))
+        
+        (println "\n💡 Suggested Actions:")
+        (cond
+          ;; Blocked state
+          (and (= phase "implementation") (seq blocked-items))
+          (do (println "- You have" (count blocked-items) "blocked items")
+              (println "- Consider spawning debug sessions:")
+              (doseq [item blocked-items]
+                (println (str "  runnote-transition spawn "
+                             file " debug \"" (:title item) "\" \"Initial hypothesis\""))))
+          
+          ;; Ready for transition
+          (and phase (validate-checklist content phase))
+          (do (println (str "- Ready for phase transition:\n  runnote-transition transition " 
+                           file))
+              (generate-transition-summary file (next-phase phase)))
+          
+          ;; Performance concerns
+          (and (:tags metadata) (str/includes? (:tags metadata) ":performance"))
+          (println (str "- Consider performance analysis:\n  runnote-transition spawn "
+                       file " performance \"Component name\""))
+          
+          ;; Security concerns
+          (and (:tags metadata) (str/includes? (:tags metadata) ":security"))
+          (println (str "- Consider security analysis:\n  runnote-transition spawn "
+                       file " security \"Security concern\""))
+          
+          ;; Testing needed
+          (= phase "implementation")
+          (println (str "- Consider test development:\n  runnote-transition spawn "
+                       file " testing \"Feature to test\""))
+          
+          ;; Default
+          :else
+          (println "- Continue with current phase tasks"))))))
+
+(defn extract-context-cmd
+  "Extract and save context to a file"
+  [args]
+  (let [[file output-file] args]
+    (if-not (fs/exists? file)
+      (println "Error: File" file "not found")
+      (let [context (extract-all-context file)
+            output (or output-file 
+                      (str "runnotes/context-" 
+                           (fs/strip-ext (fs/file-name file)) 
+                           ".edn"))]
+        (spit output (pr-str context))
+        (println "✅ Context extracted to:" output)
+        (println "\nExtracted sections:")
+        (doseq [[k v] context]
+          (when (and v (not= k :file) (not= k :metadata) (not= k :phase))
+            (println (str "  • " (name k)))))))))
+
+(defn analyze-session
+  "Analyze entire RunNotes session across all phases"
+  [args runnotes-dir]
+  (let [[topic-pattern] args
+        pattern (or topic-pattern "*")
+        files (fs/glob runnotes-dir (str "RunNotes-*-" pattern "-*.md"))
+        grouped (group-by #(nth (str/split (fs/file-name %) #"-") 4) files)]
+    (if (empty? files)
+      (println "No RunNotes files found matching pattern:" pattern)
+      (do
+        (println "\n📊 RunNotes Session Analysis")
+        (println "============================")
+        (doseq [[topic topic-files] grouped]
+          (println "\n📁 Topic:" topic)
+          (let [phases (map #(last (str/split (fs/strip-ext (fs/file-name %)) #"-")) 
+                           topic-files)
+                contexts (map extract-all-context topic-files)]
+            (println "  Phases completed:" (str/join ", " phases))
+            
+            ;; Analyze research phase
+            (when-let [research (first (filter #(= "research" (:phase %)) contexts))]
+              (println "\n  📚 Research Phase:")
+              (when (:research-questions research)
+                (println "    ✓ Research questions documented"))
+              (when (:open-questions research)
+                (println "    ⚠️  Has open questions"))
+              (when (:risks research)
+                (println "    ⚠️  Risks identified")))
+            
+            ;; Analyze planning phase
+            (when-let [planning (first (filter #(= "planning" (:phase %)) contexts))]
+              (println "\n  📋 Planning Phase:")
+              (when (:selected-approach planning)
+                (println "    ✓ Approach selected"))
+              (when (:architecture-decisions planning)
+                (println "    ✓ Architecture decisions made"))
+              (when (:success-criteria planning)
+                (println "    ✓ Success criteria defined")))
+            
+            ;; Analyze implementation phase
+            (when-let [impl (first (filter #(= "implementation" (:phase %)) contexts))]
+              (println "\n  🔨 Implementation Phase:")
+              (when-let [patterns (:work-patterns impl)]
+                (println "    Work entries:" (:total-entries patterns))
+                (when (:time-span patterns)
+                  (println "    Time span:" (:time-span patterns)))
+                (when-let [states (:states patterns)]
+                  (doseq [[state count] states]
+                    (println (str "    " state " states: " count)))))
+              (when (pos? (:blocked-count impl 0))
+                (println "    🔴 Blocked items:" (:blocked-count impl))))))))))
+
+(defn print-usage []
+  (println "RunNotes Transition Manager")
+  (println "")
+  (println "Usage:")
+  (println "  runnote-transition [--dir <path>] validate <file> <next-phase>")
+  (println "  runnote-transition [--dir <path>] transition <file>")
+  (println "  runnote-transition [--dir <path>] spawn <parent-file> <type> <title> [hypothesis]")
+  (println "  runnote-transition [--dir <path>] list-blocked")
+  (println "  runnote-transition [--dir <path>] suggest <file>")
+  (println "  runnote-transition [--dir <path>] extract-context <file> [output-file]")
+  (println "  runnote-transition [--dir <path>] analyze-session [topic-pattern]")
+  (println "")
+  (println "Configuration (3-tier precedence):")
+  (println "  1. CLI: --dir /path/to/runnotes")
+  (println "  2. ENV: RUNNOTE_DIR=/path/to/runnotes")
+  (println "  3. Config: ~/.runnote/config.edn {:runnote {:root-dir \"/path\"}}")
+  (println "  4. Default: ./runnotes")
+  (println "")
+  (println "Spawn types: debug, testing, performance, security")
+  (println "")
+  (println "Examples:")
+  (println "  # Validate transition readiness")
+  (println "  runnote-transition validate runnotes/RunNotes-2025-06-29-Feature-research.md planning")
+  (println "")
+  (println "  # Transition to next phase")
+  (println "  runnote-transition transition runnotes/RunNotes-2025-06-29-Feature-research.md")
+  (println "")
+  (println "  # Spawn debug session")
+  (println "  runnote-transition spawn runnotes/RunNotes-2025-06-29-Feature-implementation.md \\")
+  (println "    debug \"Async timeout\" \"Race condition in channel close\"")
+  (println "")
+  (println "  # With custom directory")
+  (println "  runnote-transition --dir /custom/path transition file.md"))
+
+(defn parse-args
+  "Parse command line arguments with --dir support"
+  [args]
+  (loop [remaining args
+         parsed {:command nil :args [] :dir nil}]
+    (if (empty? remaining)
+      parsed
+      (let [current (first remaining)
+            next-args (rest remaining)]
+        (cond
+          (= current "--dir")
+          (recur (rest next-args)
+                 (assoc parsed :dir (first next-args)))
+
+          (nil? (:command parsed))
+          (recur next-args
+                 (assoc parsed :command current))
+
+          :else
+          (recur next-args
+                 (update parsed :args conj current)))))))
+
+(defn -main [& args]
+  (if (empty? args)
+    (print-usage)
+    (let [{:keys [command args dir]} (parse-args args)
+          runnotes-dir (get-runnote-dir dir)]
+      (case command
+        "validate" (validate args)
+        "transition" (transition args runnotes-dir)
+        "spawn" (spawn-sub-mode args runnotes-dir)
+        "spawn-debug" (spawn-sub-mode (cons "debug" args) runnotes-dir)  ; Backward compatibility
+        "list-blocked" (list-blocked args runnotes-dir)
+        "suggest" (suggest-next args)
+        "extract-context" (extract-context-cmd args)
+        "analyze-session" (analyze-session args runnotes-dir)
+        (do (println "Unknown command:" command)
+            (print-usage))))))
+
+(when (= *file* (System/getProperty "babashka.file"))
+  (apply -main *command-line-args*))
