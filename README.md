@@ -540,13 +540,6 @@ RunNotes is designed to be extensible:
 - **Scripts**: Extend functionality in `~/.runnote/bin/`
 - **Configuration**: Add custom settings in configs
 
-## References
-
-- **ADR-00035**: Folder and Script Naming Conventions
-- **ADR-00016**: RunNotes Integration with Development
-- **CLAUDE.md**: AI Assistant Operational Guide
-- **Templates**: `~/.runnote/template/*.md`
-
 ## License
 
 See project license file.
