@@ -20,12 +20,14 @@ RunNotes value depends on documentation quality. Enforce these standards:
 **Format: HH:MM (24-hour)**
 
 ✅ Correct:
+
 ```markdown
 ### 14:30 - Implementing authentication
 ### 09:15 - Blocker: Database connection failed
 ```
 
 ❌ Incorrect:
+
 ```markdown
 ### 2:30pm - Implementing authentication  (use 24-hour)
 ### Morning - Started work               (too vague)
@@ -37,6 +39,7 @@ RunNotes value depends on documentation quality. Enforce these standards:
 **Use emoji indicators consistently:**
 
 ✅ Correct:
+
 ```markdown
 State: 🟢 Active
 State: 🟡 Investigating
@@ -44,6 +47,7 @@ State: 🔴 Blocked
 ```
 
 ❌ Incorrect:
+
 ```markdown
 State: Active         (missing emoji)
 State: Working on it  (vague, no standard indicator)
@@ -55,6 +59,7 @@ State: ⚠️ Problem    (non-standard emoji)
 **Always specify language for syntax highlighting:**
 
 ✅ Correct:
+
 ````markdown
 ```python
 def calculate_refund(order):
@@ -67,6 +72,7 @@ npm install --save express
 ````
 
 ❌ Incorrect:
+
 ````markdown
 ```
 def calculate_refund(order):  # No language specified
@@ -79,6 +85,7 @@ def calculate_refund(order):  # No language specified
 **Use numbers, not adjectives:**
 
 ✅ Correct:
+
 ```markdown
 **Time**: 45 minutes
 **Performance**: 150ms → 45ms (70% improvement)
@@ -87,6 +94,7 @@ def calculate_refund(order):  # No language specified
 ```
 
 ❌ Incorrect:
+
 ```markdown
 **Time**: A while
 **Performance**: Much faster now
@@ -99,6 +107,7 @@ def calculate_refund(order):  # No language specified
 **Link to specific locations:**
 
 ✅ Correct:
+
 ```markdown
 **Implementation**: src/auth/middleware.py:45-67
 **Test**: test/auth/test_middleware.py:23-45
@@ -107,6 +116,7 @@ def calculate_refund(order):  # No language specified
 ```
 
 ❌ Incorrect:
+
 ```markdown
 **Implementation**: auth middleware file
 **Test**: in the test directory
@@ -125,6 +135,7 @@ Failed attempts are valuable negative knowledge. Document thoroughly:
 **Be specific about assumptions:**
 
 ✅ Correct:
+
 ```markdown
 **Hypothesis**: Connection pooling with 50 max connections will handle 1000 req/sec
 
@@ -135,6 +146,7 @@ Failed attempts are valuable negative knowledge. Document thoroughly:
 ```
 
 ❌ Incorrect:
+
 ```markdown
 **Hypothesis**: Thought connection pooling would make it faster
 ```
@@ -144,6 +156,7 @@ Failed attempts are valuable negative knowledge. Document thoroughly:
 **Track time spent on failed approach:**
 
 ✅ Correct:
+
 ```markdown
 **Time Investment**:
 - Initial research: 30 minutes
@@ -153,6 +166,7 @@ Failed attempts are valuable negative knowledge. Document thoroughly:
 ```
 
 ❌ Incorrect:
+
 ```markdown
 **Time**: Spent a while on this
 ```
@@ -162,6 +176,7 @@ Failed attempts are valuable negative knowledge. Document thoroughly:
 **Describe specific failure with evidence:**
 
 ✅ Correct:
+
 ```markdown
 **Failure Mode**: Connection pool exhaustion under load
 
@@ -173,6 +188,7 @@ Failed attempts are valuable negative knowledge. Document thoroughly:
 ```
 
 ❌ Incorrect:
+
 ```markdown
 **Failure**: Didn't work, got errors
 ```
@@ -182,6 +198,7 @@ Failed attempts are valuable negative knowledge. Document thoroughly:
 **Explain WHY it failed:**
 
 ✅ Correct:
+
 ```markdown
 **Root Cause**:
 Database query optimization was the actual bottleneck, not connection count.
@@ -194,6 +211,7 @@ Connection pooling couldn't help because query time was the limiting factor.
 ```
 
 ❌ Incorrect:
+
 ```markdown
 **Root Cause**: Connection pooling was wrong approach
 ```
@@ -203,6 +221,7 @@ Connection pooling couldn't help because query time was the limiting factor.
 **How to avoid this in future:**
 
 ✅ Correct:
+
 ```markdown
 **Prevention**:
 1. Profile queries BEFORE optimizing connection pooling
@@ -213,6 +232,7 @@ Connection pooling couldn't help because query time was the limiting factor.
 ```
 
 ❌ Incorrect:
+
 ```markdown
 **Prevention**: Don't use connection pooling
 ```
@@ -222,6 +242,7 @@ Connection pooling couldn't help because query time was the limiting factor.
 **Nothing is 100% waste:**
 
 ✅ Correct:
+
 ```markdown
 **Salvageable**:
 - Connection pool configuration is sound (can keep current settings)
@@ -232,6 +253,7 @@ Connection pooling couldn't help because query time was the limiting factor.
 ```
 
 ❌ Incorrect:
+
 ```markdown
 **Salvageable**: Nothing, complete waste
 ```
@@ -245,6 +267,7 @@ Phase transitions must meet criteria. Don't skip or rush phases:
 ### Don't Skip Planning
 
 **Anti-pattern:**
+
 ```markdown
 # RunNotes-2025-10-14-Feature-implementation
 
@@ -252,6 +275,7 @@ Phase transitions must meet criteria. Don't skip or rush phases:
 ```
 
 **Why it's wrong:**
+
 - No understanding of problem space
 - No evaluation of alternatives
 - No time estimates
@@ -259,6 +283,7 @@ Phase transitions must meet criteria. Don't skip or rush phases:
 - High risk of thrashing and rework
 
 **Correct pattern:**
+
 ```bash
 # 1. Research (if unfamiliar)
 runnote-launch research Feature
@@ -273,6 +298,7 @@ runnote-launch implementation Feature
 ### Update Implementation Logs Regularly
 
 **Anti-pattern:**
+
 ```markdown
 ### 09:00 - Started work
 ...
@@ -282,12 +308,14 @@ runnote-launch implementation Feature
 ```
 
 **Why it's wrong:**
+
 - Lost context (what happened in those 6 hours?)
 - No failure documentation
 - No blocker tracking
 - Can't learn from the journey
 
 **Correct pattern:**
+
 ```markdown
 ### 09:00 - Started Phase 1: Authentication middleware
 State: 🟢 Active
@@ -320,12 +348,14 @@ Time: 6 hours
 ### Complete Review to Capture Learnings
 
 **Anti-pattern:**
+
 ```markdown
 # Just tag implementation session as "done" and move on
 # No review, no metrics, no DAKI, no pattern extraction
 ```
 
 **Why it's wrong:**
+
 - Learnings lost
 - Can't improve estimation
 - Patterns not identified
@@ -333,11 +363,13 @@ Time: 6 hours
 - Failure ROI not captured
 
 **Correct pattern:**
+
 ```bash
 runnote-launch review Feature
 ```
 
 Then:
+
 - Calculate all metrics
 - Compare to estimates
 - Document failures and learnings
@@ -348,6 +380,7 @@ Then:
 ### Meet Transition Criteria Before Advancing
 
 **Anti-pattern:**
+
 ```markdown
 # Research phase with unanswered questions
 ## Research Questions
@@ -359,6 +392,7 @@ Then:
 ```
 
 **Why it's wrong:**
+
 - Planning without complete understanding
 - Decisions made with missing information
 - Risk of rework when gaps discovered
@@ -367,11 +401,13 @@ Then:
 **Correct pattern:**
 
 Check transition criteria:
+
 - [ ] Research questions answered ❌ (Questions 2 and 3 unanswered)
 - [ ] Findings documented ✅
 - [ ] Constraints identified ❌ (Security requirements unknown)
 
 **Action**: Don't transition yet. Complete research:
+
 - Ask product team about security and performance requirements
 - Document answers
 - Update findings
@@ -386,12 +422,14 @@ Check transition criteria:
 **Symptom**: Jumping straight from idea to implementation
 
 **Problem**:
+
 - No evaluation of alternatives
 - No time estimates
 - Thrashing during implementation
 - Rework and wasted effort
 
 **Solution**:
+
 ```bash
 # Always follow phase discipline
 runnote-launch research Topic    # If unfamiliar
@@ -404,6 +442,7 @@ runnote-launch implementation Topic
 **Symptom**: Writing notes hours or days after the work
 
 **Problem**:
+
 - Context lost to memory decay
 - Sanitized history (forget failures)
 - Missing timestamps and actual timeline
@@ -411,9 +450,11 @@ runnote-launch implementation Topic
 - Lost decision rationale
 
 **Solution**:
+
 - Update every 30-60 minutes during active work
 - Document in real-time, not retrospectively
 - If forced to document retroactively, mark it as such:
+
   ```markdown
   **Note**: This section documented retroactively on [date].
   Some context may be lost or approximate.
@@ -424,6 +465,7 @@ runnote-launch implementation Topic
 **Symptom**: Generic statements without evidence
 
 ❌ Vague:
+
 ```markdown
 ### Morning - Worked on feature
 Made some progress. Hit some issues but figured them out.
@@ -431,6 +473,7 @@ Feature is mostly working now.
 ```
 
 ✅ Specific:
+
 ```markdown
 ### 09:30 - Implementing OAuth2 callback handler
 State: 🟢 Active
@@ -458,6 +501,7 @@ State: ✅ Complete
 **Symptom**: Long stretches without entries
 
 ❌ Missing timestamps:
+
 ```markdown
 # Started work
 ...
@@ -467,6 +511,7 @@ State: ✅ Complete
 ```
 
 ✅ Regular timestamps:
+
 ```markdown
 ### 09:00 - Session start
 ### 10:30 - Progress update
@@ -483,6 +528,7 @@ State: ✅ Complete
 **Symptom**: Orphaned sessions with no context connections
 
 ❌ Isolated:
+
 ```markdown
 # RunNotes-2025-10-14-Feature-implementation
 
@@ -490,6 +536,7 @@ State: ✅ Complete
 ```
 
 ✅ Connected:
+
 ```markdown
 # RunNotes-2025-10-14-Feature-implementation
 
@@ -521,6 +568,7 @@ Related sessions:
 **Symptom**: Work stops but session has no closure or next steps
 
 ❌ Abandoned:
+
 ```markdown
 ### 14:30 - Hit blocker with database connection
 State: 🔴 Blocked
@@ -529,12 +577,14 @@ State: 🔴 Blocked
 ```
 
 **Problem**:
+
 - Future you (or teammates) don't know what happened
 - Context lost
 - Work may be duplicated
 - Blockers not escalated
 
 ✅ Proper handoff:
+
 ```markdown
 ### 14:30 - Hit blocker with database connection
 State: 🔴 Blocked
@@ -568,6 +618,7 @@ Tests passing for completed phases. See blocker tracking issue #1234.
 **Symptom**: Tag proliferation and inconsistent naming
 
 ❌ Inconsistent:
+
 ```markdown
 # Session 1
 :tag #{:auth :Authentication :user-auth}
@@ -580,11 +631,13 @@ Tests passing for completed phases. See blocker tracking issue #1234.
 ```
 
 **Problem**:
+
 - Cannot find related sessions
 - Tag search ineffective
 - No standard taxonomy
 
 ✅ Consistent:
+
 ```markdown
 # Establish project taxonomy in .runnote.edn
 {:project-tags #{:authentication :authorization :database :api}}
@@ -601,6 +654,7 @@ Tests passing for completed phases. See blocker tracking issue #1234.
 ```
 
 **Guidelines**:
+
 1. Search existing tags before creating new ones: `runnote-search list-tags`
 2. Use lowercase keywords
 3. Use singular form (`:database` not `:databases`)

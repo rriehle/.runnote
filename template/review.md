@@ -93,12 +93,14 @@
 ## Performance Analysis
 
 **Actual vs Estimated**:
+
 - Research: [Actual] vs [Estimated]
 - Planning: [Actual] vs [Estimated]
 - Implementation: [Actual] vs [Estimated]
 - Review: [Actual] vs [Estimated]
 
 **Time Distribution**:
+
 - Productive coding: [percentage]
 - Debugging: [percentage]
 - Testing: [percentage]

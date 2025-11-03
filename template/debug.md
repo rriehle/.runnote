@@ -20,6 +20,7 @@
 Check relevant architectural decisions: `adr-search content "[component/feature name]"`
 
 **Known architectural constraints affecting this area**:
+
 - [Any relevant ADR decisions that might explain the behavior]
 - [Architectural patterns this component follows]
 

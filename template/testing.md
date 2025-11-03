@@ -22,6 +22,7 @@ What we aim to validate:
 Review testing patterns: `adr-search tag :testing`
 
 **Established testing strategies**:
+
 - [Testing ADRs that define approaches and tools]
 - [Test organization patterns]
 
@@ -30,14 +31,17 @@ Review testing patterns: `adr-search tag :testing`
 ### Test Categories
 
 **Unit Tests**:
+
 - [ ] [Component 1] - [What's tested]
 - [ ] [Component 2] - [What's tested]
 
 **Integration Tests**:
+
 - [ ] [Workflow 1] - [End-to-end scenario]
 - [ ] [Workflow 2] - [Cross-module interaction]
 
 **Property Tests** (if applicable):
+
 - [ ] [Property 1] - [Invariant to verify]
 - [ ] [Property 2] - [Relationship to maintain]
 
@@ -89,6 +93,7 @@ Review testing patterns: `adr-search tag :testing`
 **Overall Coverage**: [Percentage]
 
 **Gaps Identified**:
+
 - [Uncovered code path 1]
 - [Uncovered code path 2]
 

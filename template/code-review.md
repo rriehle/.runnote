@@ -77,6 +77,7 @@ adr-search tag :architecture
 - [ ] Dependencies are up to date and secure
 
 **Security Concerns**:
+
 - [List any security issues found]
 
 ## Performance Review
@@ -89,6 +90,7 @@ adr-search tag :architecture
 - [ ] Scalability considered
 
 **Performance Concerns**:
+
 - [List any performance issues]
 
 ## Testing Review

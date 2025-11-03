@@ -26,6 +26,7 @@ This document provides detailed documentation for all RunNotes phases. For a qui
 **Objective:** Deep exploration and problem understanding before committing to any approach.
 
 **When to use:**
+
 - Investigating unfamiliar problem domains
 - Evaluating new technologies
 - Understanding legacy systems
@@ -46,6 +47,7 @@ This document provides detailed documentation for all RunNotes phases. For a qui
 ```
 
 **Agent responsibilities:**
+
 - Document ALL findings, even tangential or "obvious" ones
 - Record exact sources (URLs, file paths with line numbers, specific documentation sections)
 - Capture hypotheses BEFORE testing them
@@ -56,11 +58,13 @@ This document provides detailed documentation for all RunNotes phases. For a qui
 - Ask clarifying questions to expose tacit knowledge
 
 **State indicators:**
+
 - 🟢 Active investigation
 - 🟡 Investigating/blocked on external dependency
 - 🔴 Blocked on missing information
 
 **Transition criteria to Planning:**
+
 - [ ] Research questions answered comprehensively
 - [ ] Key findings documented with specific evidence
 - [ ] Risk factors identified and assessed
@@ -70,6 +74,7 @@ This document provides detailed documentation for all RunNotes phases. For a qui
 - [ ] No critical unknowns remain (or unknowns are acknowledged)
 
 **Red flags:**
+
 - Vague findings like "seems to work" (need specifics)
 - No sources cited (where did this information come from?)
 - Jumping to solution before understanding problem
@@ -83,6 +88,7 @@ This document provides detailed documentation for all RunNotes phases. For a qui
 **Objective:** Evaluate alternatives and commit to specific approach with realistic estimates.
 
 **When to use:**
+
 - After completing research (import context from research session)
 - Before starting any significant implementation
 - When re-planning after major blocker or pivot
@@ -116,6 +122,7 @@ This document provides detailed documentation for all RunNotes phases. For a qui
 ```
 
 **Agent responsibilities:**
+
 - Search existing ADRs BEFORE making decisions (`adr-search content "topic"`)
 - Reference relevant ADRs in context section
 - Identify ADR candidates (significant decisions needing formal documentation)
@@ -127,6 +134,7 @@ This document provides detailed documentation for all RunNotes phases. For a qui
 - Create risk mitigation strategies
 
 **Transition criteria to Implementation:**
+
 - [ ] Approach validated and specifically documented
 - [ ] Implementation broken into phases with time estimates
 - [ ] Success criteria defined and measurable
@@ -136,6 +144,7 @@ This document provides detailed documentation for all RunNotes phases. For a qui
 - [ ] Planning reviewed (by team or self-review if solo)
 
 **Red flags:**
+
 - No alternatives considered (really just one way?)
 - Only positive consequences listed (every decision has trade-offs)
 - Vague estimates ("a few hours", "not long")
@@ -151,6 +160,7 @@ This document provides detailed documentation for all RunNotes phases. For a qui
 **Objective:** Execute the plan with real-time logging of progress, obstacles, and adaptations.
 
 **When to use:**
+
 - Active development work
 - During implementation of planned features
 - When executing on agreed approach
@@ -178,6 +188,7 @@ Progress: [=====>    ] 50% (of current phase)
 ```
 
 **Agent responsibilities:**
+
 - Update session every 30-60 minutes during active work
 - Use precise timestamps (HH:MM format)
 - Document state changes (Active → Investigating → Blocked)
@@ -191,6 +202,7 @@ Progress: [=====>    ] 50% (of current phase)
 - Link to related ADRs and other RunNotes
 
 **Update frequency:**
+
 - 30-60 minutes during focused work
 - Immediately when hitting blockers
 - After completing each planned phase
@@ -198,11 +210,13 @@ Progress: [=====>    ] 50% (of current phase)
 - End of work session (even if incomplete)
 
 **State management:**
+
 - 🟢 **Active**: Making progress on planned work
 - 🟡 **Investigating**: Researching unexpected issue or blocker
 - 🔴 **Blocked**: Cannot proceed, external dependency or decision needed
 
 **Transition criteria to Review:**
+
 - [ ] All planned implementation phases completed OR explicitly deferred with reason
 - [ ] Tests passing (or test plan documented if not yet implemented)
 - [ ] Code committed or work-in-progress documented
@@ -211,6 +225,7 @@ Progress: [=====>    ] 50% (of current phase)
 - [ ] Time investment tracked for all major activities
 
 **Red flags:**
+
 - Long gaps without updates (>2 hours with no log entry)
 - Vague progress descriptions ("made progress", "worked on feature")
 - No timestamps or inconsistent time tracking
@@ -227,6 +242,7 @@ Progress: [=====>    ] 50% (of current phase)
 **Objective:** Extract learnings, calculate metrics, identify patterns, and generate actionable next steps.
 
 **When to use:**
+
 - After completing implementation (successful or abandoned)
 - End of sprint/iteration
 - Post-mortem after incidents
@@ -312,6 +328,7 @@ Progress: [=====>    ] 50% (of current phase)
 ```
 
 **Agent responsibilities:**
+
 - Calculate actual vs estimated time for all phases
 - Identify patterns by comparing to similar historical sessions
 - Facilitate DAKI analysis (Drop/Add/Keep/Improve)
@@ -324,6 +341,7 @@ Progress: [=====>    ] 50% (of current phase)
 - Update related documentation with learnings
 
 **Metrics to calculate:**
+
 - Time efficiency (estimated vs actual)
 - Code velocity (if applicable)
 - Test coverage delta (if applicable)
@@ -332,6 +350,7 @@ Progress: [=====>    ] 50% (of current phase)
 - Knowledge artifacts produced
 
 **DAKI facilitation:**
+
 - Ask probing questions to extract insights
 - Challenge vague statements ("be more specific")
 - Cross-reference with historical sessions
@@ -339,6 +358,7 @@ Progress: [=====>    ] 50% (of current phase)
 - Force prioritization (top 3 in each category)
 
 **Completion criteria:**
+
 - [ ] All metrics calculated and documented
 - [ ] DAKI analysis complete with specifics
 - [ ] Key learnings extracted (technical and process)
@@ -348,6 +368,7 @@ Progress: [=====>    ] 50% (of current phase)
 - [ ] Session archived in appropriate location
 
 **Red flags:**
+
 - No metrics ("it went fine")
 - Vague learnings ("learned a lot")
 - No DAKI analysis
@@ -363,11 +384,13 @@ Progress: [=====>    ] 50% (of current phase)
 ### Debug Phase
 
 **When to use:**
+
 - Systematic debugging of complex issues
 - Bug investigation and root cause analysis
 - Production incident response
 
 **Key sections:**
+
 ```markdown
 ## Problem Statement
 [Precise description of bug/issue]
@@ -387,6 +410,7 @@ Progress: [=====>    ] 50% (of current phase)
 ```
 
 **Documentation emphasis:**
+
 - Systematic hypothesis testing
 - Evidence-based investigation
 - Clear root cause identification
@@ -397,17 +421,20 @@ Progress: [=====>    ] 50% (of current phase)
 ### Hotfix Phase
 
 **When to use:**
+
 - Urgent production fixes
 - Critical security patches
 - Time-sensitive bug fixes
 
 **Key characteristics:**
+
 - Compressed timeline (hours not days)
 - Minimal scope (fix only what's broken)
 - Risk mitigation (rollback plan documented)
 - Fast-track review process
 
 **Documentation emphasis:**
+
 - What broke and impact
 - Minimal viable fix
 - Testing performed (even if abbreviated)
@@ -415,6 +442,7 @@ Progress: [=====>    ] 50% (of current phase)
 - Follow-up work needed
 
 **Template sections:**
+
 ```markdown
 ## Incident Summary
 **Impact**: Who/what is affected
@@ -443,11 +471,13 @@ Progress: [=====>    ] 50% (of current phase)
 ### Performance Phase
 
 **When to use:**
+
 - Performance optimization work
 - Scalability improvements
 - Resource utilization analysis
 
 **Key sections:**
+
 ```markdown
 ## Baseline Metrics
 [Current performance measurements]
@@ -467,6 +497,7 @@ Progress: [=====>    ] 50% (of current phase)
 ```
 
 **Documentation emphasis:**
+
 - Baseline measurement before changes
 - Hypothesis-driven optimization
 - Quantified results for each attempt
@@ -478,17 +509,20 @@ Progress: [=====>    ] 50% (of current phase)
 ### Security Phase
 
 **When to use:**
+
 - Security analysis and hardening
 - Vulnerability assessment
 - Security feature implementation
 
 **Key characteristics:**
+
 - Threat modeling
 - Attack vector analysis
 - Defense in depth documentation
 - Compliance verification
 
 **Template sections:**
+
 ```markdown
 ## Security Analysis
 **Scope**: What is being analyzed
@@ -513,11 +547,13 @@ Progress: [=====>    ] 50% (of current phase)
 ### Testing Phase
 
 **When to use:**
+
 - Test strategy planning
 - Test suite implementation
 - Test coverage analysis
 
 **Key sections:**
+
 - Test strategy and approach
 - Coverage goals
 - Test case design
@@ -525,6 +561,7 @@ Progress: [=====>    ] 50% (of current phase)
 - Gap analysis
 
 **Template sections:**
+
 ```markdown
 ## Test Strategy
 **Scope**: What is being tested
@@ -552,11 +589,13 @@ Progress: [=====>    ] 50% (of current phase)
 ### Code Review Phase
 
 **When to use:**
+
 - Structured code review documentation
 - Pre-merge review sessions
 - Architectural review
 
 **Key sections:**
+
 - Review scope and objectives
 - Findings by category (critical/major/minor/nit)
 - Patterns observed
@@ -564,6 +603,7 @@ Progress: [=====>    ] 50% (of current phase)
 - Follow-up actions
 
 **Template sections:**
+
 ```markdown
 ## Review Scope
 **Code**: What is being reviewed

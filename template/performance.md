@@ -22,6 +22,7 @@ What we're optimizing:
 Review existing performance decisions: `adr-search tag :performance`
 
 **Established performance patterns**:
+
 - [Performance ADRs that affect this component]
 - [Architectural constraints on optimization approaches]
 
@@ -61,11 +62,13 @@ Review existing performance decisions: `adr-search tag :performance`
 ## Benchmark Results
 
 **Before Optimization**:
+
 ```
 [Benchmark output]
 ```
 
 **After Optimization**:
+
 ```
 [Benchmark output]
 ```

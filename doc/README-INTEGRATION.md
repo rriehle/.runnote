@@ -19,6 +19,7 @@ RunNotes and ADRs work together to document the journey from exploration to deci
 During research and planning phases, identify decisions that need formal documentation.
 
 **ADR candidate indicators:**
+
 - Decision affects multiple components
 - Decision is expensive to reverse
 - Decision establishes or changes pattern
@@ -42,6 +43,7 @@ adr-candidates:
 ### Linking RunNotes to ADRs
 
 **In planning RunNotes metadata:**
+
 ```edn
 {:related-documents
  {:adr #{"ADR-00042-event-sourcing"
@@ -49,6 +51,7 @@ adr-candidates:
 ```
 
 **In planning RunNotes content:**
+
 ```markdown
 ## Architectural Decisions
 
@@ -59,12 +62,14 @@ Per ADR-00042, all state changes will be persisted as events to maintain complet
 ```
 
 **In ADR metadata:**
+
 ```edn
 {:runnotes #{"RunNotes-2025-10-14-AuditTrail-research"
              "RunNotes-2025-10-14-AuditTrail-planning"}}
 ```
 
 **In ADR content:**
+
 ```markdown
 ## Context
 
@@ -76,28 +81,33 @@ Planning session RunNotes-2025-10-14-AuditTrail-planning evaluated three approac
 ### Workflow: RunNotes → ADR → RunNotes
 
 **Phase 1: Research (RunNotes)**
+
 ```bash
 runnote-launch research AuditTrail
 ```
 
 Document:
+
 - Business need (regulatory compliance)
 - Technical investigation (approaches: audit table, CDC, event sourcing)
 - Trade-offs of each approach
 - Identify as ADR candidate
 
 **Phase 2: Planning (RunNotes)**
+
 ```bash
 runnote-launch planning AuditTrail
 ```
 
 Document:
+
 - Evaluation of alternatives
 - Decision: event sourcing
 - Rationale and trade-offs
 - Mark for ADR creation
 
 **Phase 3: Create ADR**
+
 ```bash
 cp ~/.adr/template/default.md doc/adr/00042-event-sourcing-audit-trail.md
 ```
@@ -108,22 +118,26 @@ cp ~/.adr/template/default.md doc/adr/00042-event-sourcing-audit-trail.md
 - Link back to RunNotes in metadata
 
 **Phase 4: Implementation (RunNotes)**
+
 ```bash
 runnote-launch implementation AuditTrail
 ```
 
 Document:
+
 - Reference ADR-00042 in implementation notes
 - Track adherence to architectural decision
 - Document any implementation learnings
 - Note if ADR needs updates based on implementation reality
 
 **Phase 5: Review (RunNotes)**
+
 ```bash
 runnote-launch review AuditTrail
 ```
 
 Document:
+
 - Validate decision (was ADR-00042 right?)
 - Document implementation learnings
 - Identify if ADR needs updates
@@ -140,6 +154,7 @@ Requirements specify WHAT to build; RunNotes document WHY and HOW.
 Planning phase RunNotes contain raw material for requirements.
 
 **In planning RunNotes:**
+
 ```yaml
 objectives:
   - Enable customer service to process refunds
@@ -155,17 +170,20 @@ success-criteria:
 ```
 
 **Extract to formal requirements:**
+
 - REQ-REFUND-001: System MUST calculate refund amount
 - REQ-REFUND-002: System MUST verify 30-day window
 - REQ-REFUND-003: System MUST integrate with Stripe
 - REQ-REFUND-NFR-001: System MUST complete refunds within 24 hours
 
 **Link requirements to planning RunNotes:**
+
 ```edn
 {:trace {:runnote #{"RunNotes-2025-10-14-RefundProcess-planning"}}}
 ```
 
 **Link planning RunNotes to requirements:**
+
 ```edn
 {:related-documents
  {:requirements #{"REQ-REFUND-001"
@@ -179,6 +197,7 @@ success-criteria:
 During implementation, track which requirements are being fulfilled.
 
 **In implementation RunNotes:**
+
 ```markdown
 ### [HH:MM] - Implementing Refund Calculation
 Implements: REQ-REFUND-001
@@ -190,6 +209,7 @@ Implements: REQ-REFUND-001
 ```
 
 **Update requirements with implementation links:**
+
 ```edn
 {:trace {:code #{"src/refunds/calculator.py:45-67"}
          :runnote #{"RunNotes-2025-10-14-RefundProcess-implementation"}}}
@@ -198,24 +218,28 @@ Implements: REQ-REFUND-001
 ### Workflow: Business Need → Requirements → Implementation
 
 **Phase 1: Planning RunNotes**
+
 - Document business need
 - Define objectives and success criteria
 - Identify functional and non-functional needs
 - Create implementation plan
 
 **Phase 2: Requirements Extraction**
+
 - Create formal requirements from planning notes
 - Link requirements to planning RunNotes
 - Define acceptance criteria
 - Link to relevant ADRs (architectural constraints)
 
 **Phase 3: Implementation RunNotes**
+
 - Reference requirements in implementation logs
 - Track implementation against acceptance criteria
 - Document deviations with rationale
 - Link code to requirements
 
 **Phase 4: Review RunNotes**
+
 - Verify requirements met
 - Document any gaps or deferred work
 - Update requirements status
@@ -230,6 +254,7 @@ RunNotes provide context for code changes and test strategies.
 ### Linking Code to RunNotes
 
 **In code comments:**
+
 ```python
 # Implements event sourcing for audit trail
 # See: RunNotes-2025-10-14-AuditTrail-implementation
@@ -245,6 +270,7 @@ class EventStore:
 ```
 
 **In commit messages:**
+
 ```
 feat: implement event sourcing for audit trail
 
@@ -258,6 +284,7 @@ See: runnote/RunNotes-2025-10-14-AuditTrail-implementation.md
 ```
 
 **In RunNotes metadata:**
+
 ```edn
 {:related-documents
  {:code-files #{"src/events/store.py"
@@ -268,6 +295,7 @@ See: runnote/RunNotes-2025-10-14-AuditTrail-implementation.md
 ### Test Strategy Documentation
 
 **In planning RunNotes:**
+
 ```markdown
 ## Test Strategy
 
@@ -287,6 +315,7 @@ See: runnote/RunNotes-2025-10-14-AuditTrail-implementation.md
 ```
 
 **In implementation RunNotes:**
+
 ```markdown
 ### [HH:MM] - Test Implementation
 **Testing**: Event store persistence tests
@@ -296,6 +325,7 @@ See: runnote/RunNotes-2025-10-14-AuditTrail-implementation.md
 ```
 
 **Link to test files:**
+
 ```edn
 {:related-documents
  {:test-files #{"test/events/test_store.py"
@@ -324,6 +354,7 @@ Per discussion with architect, documenting as:
 ```
 
 This creates a feedback loop:
+
 1. Implementation discovers gap
 2. Create requirement retroactively
 3. Link requirement to implementation

@@ -22,6 +22,7 @@ What we're securing:
 Review security decisions: `adr-search tag :security`
 
 **Established security patterns**:
+
 - [Security ADRs that define authentication/authorization models]
 - [Cryptographic standards and key management decisions]
 - [Security architecture constraints and approved approaches]

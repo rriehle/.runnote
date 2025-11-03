@@ -71,11 +71,13 @@ After implementing:
 Choose your testing approach based on implementation scope:
 
 **Unit Tests**:
+
 - [ ] Standard unit tests for individual functions/classes
 - [ ] Property-based tests for complex logic
 - [ ] Commands: [Project-specific test commands]
 
 **Integration Tests**:
+
 - [ ] Cross-module integration tests
 - [ ] End-to-end workflows
 - [ ] External system integration
@@ -90,16 +92,19 @@ Choose your testing approach based on implementation scope:
 ### Test Implementation Checklist
 
 **Before coding**:
+
 - [ ] Identified appropriate test location/framework
 - [ ] Written failing tests that define expected behavior
 - [ ] Validated test commands work
 
 **During implementation**:
+
 - [ ] Running tests frequently (ideally after each small change)
 - [ ] Tests guide implementation decisions
 - [ ] Refactoring with green tests for safety
 
 **Property Testing** (for complex business logic):
+
 - [ ] Consider property tests for data transformations
 - [ ] Use when testing invariants across large input spaces
 

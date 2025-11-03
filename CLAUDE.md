@@ -8,6 +8,7 @@ For detailed documentation:
 - **Integration:** [doc/README-INTEGRATION.md](doc/README-INTEGRATION.md) - Integration with ADR/Requirements/Code/Tests
 - **Quality:** [doc/README-QUALITY.md](doc/README-QUALITY.md) - Quality standards and common pitfalls
 - **File Format:** [doc/README-FILE-FORMAT.md](doc/README-FILE-FORMAT.md) - File naming, metadata, EDN syntax
+- **Technical Planning:** [doc/README-TECHNICAL-PLANNING.md](doc/README-TECHNICAL-PLANNING.md) - In-depth technical planning with human review gates
 - **Human Guide:** [README.md](README.md) - Installation, configuration, usage
 
 ---
@@ -57,6 +58,62 @@ For detailed documentation:
 - 🟢 **Active** - Making progress as planned
 - 🟡 **Investigating** - Researching unexpected issue
 - 🔴 **Blocked** - Cannot proceed, external dependency
+
+---
+
+## Technical Planning Quick Reference
+
+**When to Use Detailed Templates**:
+- Complex/distributed systems work
+- Performance-critical features
+- Security-sensitive features
+- Architectural decisions required
+- High risk of technical debt
+- Learning opportunity (new patterns/technologies)
+
+**Template Variants**:
+
+| Standard Template | Detailed Template | When to Use Detailed |
+|-------------------|-------------------|----------------------|
+| `research` | `research-detailed` | Technical discovery needed |
+| `planning` | `planning-detailed` | Complex technical decisions |
+| `implementation` | `implementation-detailed` | Track adherence to technical plan |
+| `review` | `review-detailed` | Extract technical decision outcomes |
+
+**Launch Detailed Templates**:
+```bash
+# Research with technical discovery
+runnote-launch research-detailed Topic
+
+# Planning with 7 technical sections + human review gates
+runnote-launch planning-detailed Topic
+
+# Implementation with adherence tracking
+runnote-launch implementation-detailed Topic
+
+# Review with technical outcomes extraction
+runnote-launch review-detailed Topic
+```
+
+**Technical Sections in planning-detailed** (each with 🚦 Human Review Gate):
+1. **Data Structures** - Select appropriate data structures with trade-off analysis
+2. **Algorithms** - Evaluate algorithmic approaches with complexity analysis
+3. **Concurrency** - Choose concurrency primitives and patterns
+4. **Testing** - Plan unit, property-based, and integration tests
+5. **Security** - Address threats, authentication, authorization, audit logging
+6. **Performance** - Establish targets and optimization strategies
+7. **Language Best Practices** - Apply language-specific idioms (Clojure, Go, Python, etc.)
+
+**Human Review Gates**:
+- AI **must stop** at each 🚦 gate and prompt human to review/approve
+- Human checks off gate after reviewing decision and trade-offs
+- Only after approval can AI proceed to next section
+
+**Language-Specific Guides**:
+- **[Clojure/JVM](doc/README-TECHNICAL-PLANNING-CLOJURE.md)** - Comprehensive Clojure patterns
+- Future: Go, Python, Rust guides as you work in those languages
+
+**Complete technical planning documentation:** [doc/README-TECHNICAL-PLANNING.md](doc/README-TECHNICAL-PLANNING.md)
 
 ---
 
@@ -298,6 +355,27 @@ In every session: Link related RunNotes, ADRs, requirements. Document assumption
 Maintain bidirectional links: RunNotes ↔ RunNotes, RunNotes ↔ ADRs, RunNotes ↔ Requirements, RunNotes → Code, RunNotes → Tests
 
 **Never create isolated documentation.**
+
+### 7. Recommend Detailed Templates When Appropriate
+
+When starting new work: Assess complexity, risk, and learning value. Recommend `-detailed` templates for:
+- Complex/distributed systems work
+- Performance-critical features
+- Security-sensitive features
+- Architectural decisions
+- High technical debt risk
+
+**Reference language-specific guides:** Point users to `README-TECHNICAL-PLANNING-CLOJURE.md` (or other language guides) during planning-detailed.
+
+### 8. Enforce Human Review Gates in Technical Planning
+
+When using `planning-detailed`: **STOP** at each 🚦 Human Review Gate. Prompt human to:
+1. Review technical analysis and decisions
+2. Validate trade-offs are understood
+3. Approve or request changes
+4. Check off gate boxes
+
+**Only proceed after human approval.** Do not skip gates or proceed without explicit human sign-off.
 
 ---
 

@@ -33,17 +33,20 @@ RunNotes-2025-10-14-SecurityPatch-hotfix.md
 ### Rules
 
 **Date component:**
+
 - Format: `YYYY-MM-DD` (ISO 8601)
 - Uses session creation date
 - Enables chronological sorting
 
 **Topic component:**
+
 - Format: PascalCase
 - Descriptive but concise
 - Consistent across phase transitions
 - Example: `AuthRefactor`, `DatabaseMigration`, `PerformanceOptimization`
 
 **Phase component:**
+
 - Format: lowercase
 - Must be one of the standard phases
 - Determines template used
@@ -52,12 +55,14 @@ RunNotes-2025-10-14-SecurityPatch-hotfix.md
 ### Standard Phases
 
 **Core phases:**
+
 - `research` - Investigation and exploration
 - `planning` - Decision making and estimation
 - `implementation` - Active development work
 - `review` - Reflection and learning extraction
 
 **Specialized phases:**
+
 - `debug` - Systematic debugging
 - `hotfix` - Urgent production fixes
 - `performance` - Optimization work
@@ -84,6 +89,7 @@ All RunNotes files include EDN metadata block at the top:
  :date {:created "2025-10-14"
         :updated "2025-10-15"}}
 ```
+
 ```
 
 ### Required Fields
@@ -145,6 +151,7 @@ All RunNotes files include EDN metadata block at the top:
 ```
 
 **Standard document types:**
+
 - `:runnote` - Other RunNotes sessions
 - `:adr` - Architecture Decision Records
 - `:requirements` - Formal requirements
@@ -175,6 +182,7 @@ success-criteria:
 ```
 
 **Common frontmatter fields:**
+
 - `objectives` - Session goals
 - `assumptions` - Explicit assumptions
 - `adr-candidates` - Decisions needing formalization
@@ -198,6 +206,7 @@ Maps are key-value pairs enclosed in `{}`:
 ```
 
 **Nested maps:**
+
 ```edn
 {:date {:created "2025-10-14"
         :updated "2025-10-15"}
@@ -216,6 +225,7 @@ Keywords start with `:` and are used as map keys:
 ```
 
 **Naming conventions:**
+
 - Lowercase
 - Hyphen-separated for multi-word
 - Example: `:thinking-mode`, `:related-documents`
@@ -231,6 +241,7 @@ Strings are enclosed in double quotes:
 ```
 
 **When to use strings:**
+
 - Dates
 - File names
 - Free-form text
@@ -246,11 +257,13 @@ Sets are collections of unique values enclosed in `#{}`:
 ```
 
 **Characteristics:**
+
 - Unordered
 - No duplicates
 - Used for tags and document references
 
 **Examples:**
+
 ```edn
 :tag #{:authentication :api :database}
 :runnote #{"RunNotes-2025-10-14-Research"}
@@ -293,6 +306,7 @@ Vectors are ordered sequences enclosed in `[]`:
 Templates are stored in `~/.runnote/template/` with template hierarchy:
 
 **Template resolution order:**
+
 1. Project template: `<project>/.runnote/template/<phase>.md`
 2. User template: `~/.runnote/template/<phase>.md`
 3. Built-in template: (included with runnote-launch)
@@ -300,24 +314,28 @@ Templates are stored in `~/.runnote/template/` with template hierarchy:
 ### Core Phase Templates
 
 **research.md**
+
 - Findings log structure
 - Investigation tracking
 - Hypothesis documentation
 - Source citation format
 
 **planning.md**
+
 - Architecture decision template
 - Implementation plan structure
 - Risk assessment sections
 - Estimation breakdown
 
 **implementation.md**
+
 - Activity log format
 - Blocker documentation
 - Progress tracking
 - Code reference format
 
 **review.md**
+
 - Metrics calculation template
 - DAKI analysis structure
 - Learnings extraction
@@ -326,36 +344,42 @@ Templates are stored in `~/.runnote/template/` with template hierarchy:
 ### Specialized Phase Templates
 
 **debug.md**
+
 - Problem statement
 - Hypothesis testing log
 - Root cause analysis
 - Fix documentation
 
 **hotfix.md**
+
 - Incident summary
 - Minimal viable fix
 - Validation steps
 - Follow-up work
 
 **performance.md**
+
 - Baseline metrics
 - Target goals
 - Optimization attempts
 - Before/after comparison
 
 **security.md**
+
 - Security analysis
 - Threat model
 - Findings by severity
 - Hardening measures
 
 **testing.md**
+
 - Test strategy
 - Coverage goals
 - Test case design
 - Execution results
 
 **code-review.md**
+
 - Review scope
 - Findings by category
 - Patterns observed
@@ -364,6 +388,7 @@ Templates are stored in `~/.runnote/template/` with template hierarchy:
 ### Customizing Templates
 
 Create project-specific template:
+
 ```bash
 mkdir -p <project>/.runnote/template
 cp ~/.runnote/template/planning.md <project>/.runnote/template/planning.md
@@ -371,12 +396,14 @@ cp ~/.runnote/template/planning.md <project>/.runnote/template/planning.md
 ```
 
 Create user-level template:
+
 ```bash
 cp ~/.runnote/template/planning.md ~/.runnote/template/planning-custom.md
 # Edit for personal preferences
 ```
 
 **Template variables:**
+
 - `{{date}}` - Current date (YYYY-MM-DD)
 - `{{time}}` - Current time (HH:MM)
 - `{{topic}}` - Topic name from command line
