@@ -5,7 +5,7 @@
 ;;            :duplicate-require {:level :off}
 ;;            :namespace-name-mismatch {:level :off}}}
 
-(ns runnote-adr-extract
+(ns ^:clj-kondo/ignore runnote-adr-extract
   (:require [clojure.string :as str]
             [babashka.fs :as fs]))
 
@@ -57,13 +57,13 @@
         decision-idx (first (keep-indexed #(when (str/includes? %2 "Decision:") %1) lines))
         consequences-idx (first (keep-indexed #(when (str/includes? %2 "Consequences:") %1) lines))]
     {:context (when context-idx
-               (str/trim (subs (nth lines context-idx) 
+               (str/trim (subs (nth lines context-idx)
                               (+ (.indexOf (nth lines context-idx) ":") 1))))
      :decision (when decision-idx
                 (str/trim (subs (nth lines decision-idx)
                                (+ (.indexOf (nth lines decision-idx) ":") 1))))
      :consequences (when consequences-idx
-                    (str/trim (str/join " " 
+                    (str/trim (str/join " "
                                       (take-while #(not (str/starts-with? % "-"))
                                                  (drop (inc consequences-idx) lines)))))}))
 
@@ -89,8 +89,8 @@
        decision "\n\n"
        "## Consequences\n\n"
        "### Positive\n\n"
-       "- " (if (string? consequences) 
-             consequences 
+       "- " (if (string? consequences)
+             consequences
              "To be determined") "\n\n"
        "### Negative\n\n"
        "- To be determined\n\n"

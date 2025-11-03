@@ -35,15 +35,20 @@
        "runnotes")))
 
 (defn validate-filename
-  "Validate RunNotes filename convention"
+  "Validate RunNotes filename convention.
+   Supports both standard and -detailed template variants.
+   Examples: RunNotes-2025-01-15-Topic-planning.md
+             RunNotes-2025-01-15-Topic-planning-detailed.md"
   [file]
   (let [filename (fs/file-name file)
-        pattern #"^RunNotes-\d{4}-\d{2}-\d{2}-[A-Za-z]+(-[a-z]+)?\.md$"]
+        ;; Updated pattern to support -detailed suffix
+        pattern #"^RunNotes-\d{4}-\d{2}-\d{2}-[A-Za-z]+-[a-z]+(-detailed)?\.md$"]
     (if (re-matches pattern filename)
       {:valid true}
       {:valid false
        :error (str "Invalid filename format: " filename
-                   "\nExpected: RunNotes-YYYY-MM-DD-TopicName-phase.md")})))
+                   "\nExpected: RunNotes-YYYY-MM-DD-TopicName-phase.md"
+                   "\n      or: RunNotes-YYYY-MM-DD-TopicName-phase-detailed.md")})))
 
 (defn validate-required-fields
   "Check for required metadata fields using EDN parser"

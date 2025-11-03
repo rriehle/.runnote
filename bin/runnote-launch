@@ -46,13 +46,25 @@
 ;; Phase Validation
 ;; ============================================================================
 
+(defn extract-base-phase
+  "Extract base phase from phase name, handling -detailed variants.
+   Examples: 'research' -> 'research'
+             'research-detailed' -> 'research'
+             'planning-detailed' -> 'planning'"
+  [phase]
+  (if (str/ends-with? phase "-detailed")
+    (subs phase 0 (- (count phase) (count "-detailed")))
+    phase))
+
 (defn validate-phase
-  "Validate that phase is in allowed set"
+  "Validate that phase (or base phase for -detailed variants) is in allowed set"
   [phase valid-phases]
-  (when-not (valid-phases phase)
-    (println (str "Error: Unknown phase '" phase "'"))
-    (println (str "Available phases: " (str/join ", " (sort valid-phases))))
-    (System/exit 1)))
+  (let [base-phase (extract-base-phase phase)]
+    (when-not (valid-phases base-phase)
+      (println (str "Error: Unknown phase '" phase "'"))
+      (println (str "Available phases: " (str/join ", " (sort valid-phases))))
+      (println (str "Note: You can append '-detailed' to any phase for detailed templates"))
+      (System/exit 1))))
 
 ;; ============================================================================
 ;; Filename Creation
@@ -178,6 +190,13 @@
   (println "  security        - Security analysis and hardening")
   (println "  testing         - Testing strategy and execution")
   (println "")
+  (println "Detailed Templates:")
+  (println "  Append '-detailed' to any phase for in-depth technical planning:")
+  (println "  research-detailed        - Technical discovery (data structures, algorithms, etc.)")
+  (println "  planning-detailed        - 7 technical sections with human review gates")
+  (println "  implementation-detailed  - Technical adherence tracking")
+  (println "  review-detailed          - Technical decision outcomes extraction")
+  (println "")
   (println "Options:")
   (println "  --tags TAG1,TAG2     Specify tags (comma-separated)")
   (println "  --thinking-mode MODE Specify thinking mode (think hard|think harder|ultrathink)")
@@ -186,6 +205,7 @@
   (println "Examples:")
   (println "  runnote-launch research UIComponents")
   (println "  runnote-launch planning DatabaseMigration --tags feature,architecture")
+  (println "  runnote-launch planning-detailed EventSourcing --tags architecture,complex")
   (println "  runnote-launch hotfix CriticalBug --thinking-mode ultrathink"))
 
 (defn parse-args
