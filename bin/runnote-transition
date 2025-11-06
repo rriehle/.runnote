@@ -160,20 +160,37 @@
       {:success false :error (str "template-" sub-mode-type ".md not found")})))
 
 (defn create-phase-file
-  "Create new RunNotes file for next phase"
-  [topic date current-phase context metadata runnotes-dir]
+  "Create new RunNotes file for next phase.
+
+  Parameters:
+    topic - Topic name (string)
+    date - Date string (YYYY-MM-DD)
+    current-phase - Current phase name
+    context - Context map from previous phase
+    metadata - Metadata map with tags, etc.
+    template-dir - Directory containing templates (from config)
+    runnotes-dir - Directory for RunNotes files
+
+  Returns: Path to created file
+
+  Throws: ExceptionInfo if template not found (with recovery guidance)"
+  [topic date current-phase context metadata template-dir runnotes-dir]
   (let [next-ph (next-phase current-phase)
         filename (str runnotes-dir "/RunNotes-" date "-" topic "-" next-ph ".md")
-        template-file (str runnotes-dir "/template-" next-ph ".md")
-        template (if (fs/exists? template-file)
-                  (slurp template-file)
-                  (str "# " (str/capitalize next-ph) ": " topic " - " date "\n\n"
-                       "> **Phase**: " (str/capitalize next-ph) "\n"
-                       "> **Previous Phase**: " (str/capitalize current-phase) " (Completed: " date ")\n"
-                       "> **Tags**: " (:tags metadata) "\n\n"
-                       "## Context From Previous Phase\n\n"
-                       (pr-str context)))]
-    (spit filename template)
+        ;; Fix: Use template-dir from config, not runnotes-dir
+        ;; Template path construction was the bug - it looked in wrong directory
+        template-file (str template-dir "/" next-ph ".md")]
+    (when-not (fs/exists? template-file)
+      (throw (ex-info (str "Template not found: " template-file "\n\n"
+                          "Recovery steps:\n"
+                          "1. Check template directory configuration\n"
+                          "2. Verify template exists: " template-file "\n"
+                          "3. Run: runnote-init to setup templates\n"
+                          "4. Or create template manually in template/" next-ph ".md")
+                     {:template-file template-file
+                      :phase next-ph
+                      :template-dir template-dir})))
+    (spit filename (slurp template-file))
     filename))
 (defn analyze-work-patterns
   "Analyze work patterns from work log entries"
@@ -286,7 +303,10 @@
                 date (str/join "-" (take 3 (drop 1 filename-parts)))
                 topic (nth filename-parts 4)
                 context (extract-context content current-phase)
-                new-file (create-phase-file topic date current-phase context metadata runnotes-dir)]
+                ;; Get template-dir from config system
+                config (config-core/load-config :runnote)
+                template-dir (config-core/resolve-runnote-template-dir config)
+                new-file (create-phase-file topic date current-phase context metadata template-dir runnotes-dir)]
             (println "✅ Created" new-file)
             (println "Context extracted and transferred")
             (println "Ready to begin" (next-phase current-phase) "phase")))))))
