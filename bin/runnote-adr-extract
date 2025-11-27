@@ -9,6 +9,10 @@
   (:require [clojure.string :as str]
             [babashka.fs :as fs]))
 
+;; Load shared library
+(load-file (str (System/getenv "HOME") "/.runnote/runnote-core.bb"))
+(def find-runnote-files (:find-runnote-files runnote-core/exports))
+
 (defn get-config
   "Get configuration with environment variable support.
   Environment variables:
@@ -185,7 +189,7 @@
 (defn batch-extract
   "Batch extract all ADR candidates"
   [config args]
-  (let [files (fs/glob (:runnotes-dir config) "RunNotes-*-planning.md")
+  (let [files (find-runnote-files (:runnotes-dir config) {:pattern "RunNotes-*-planning.md"})
         all-candidates (filter some? (map extract-from-file files))
         candidates-with-adrs (filter #(seq (:explicit-adrs %)) all-candidates)]
     (if (empty? candidates-with-adrs)

@@ -13,9 +13,11 @@
 (def lib-dir (str (System/getenv "HOME") "/.lib"))
 (load-file (str lib-dir "/config-core.bb"))
 (load-file (str lib-dir "/metadata-parser.bb"))
+(load-file (str (System/getenv "HOME") "/.runnote/runnote-core.bb"))
 
 (def parse-metadata (:parse-metadata metadata-parser/exports))
 (def extract-edn-metadata (:extract-edn-metadata metadata-parser/exports))
+(def find-runnote-files (:find-runnote-files runnote-core/exports))
 
 ;; ============================================================================
 ;; Configuration
@@ -120,7 +122,7 @@
   "Validate all RunNotes files in the directory.
    Returns summary of validation results."
   []
-  (let [files (fs/glob runnote-dir "RunNotes-*.md")
+  (let [files (find-runnote-files runnote-dir)
         results (map validate-file files)
         errors (filter #(seq (:errors %)) results)
         warnings (filter #(seq (:warnings %)) results)
