@@ -169,11 +169,6 @@
       (spit filename processed-content)
       (println (str "Created: " filename))
 
-      ;; Open in editor (if configured or $EDITOR set)
-      (let [editor (or (:editor cfg) (System/getenv "EDITOR"))]
-        (when (and editor (not (str/blank? editor)))
-          (shell/sh editor filename)))
-
       filename)))
 
 (defn print-usage []
