@@ -13,9 +13,11 @@
 (def lib-dir (str (System/getenv "HOME") "/.lib"))
 (load-file (str lib-dir "/config-core.bb"))
 (load-file (str lib-dir "/metadata-parser.bb"))
+(load-file (str (System/getenv "HOME") "/.runnote/runnote-core.bb"))
 
 (def extract-edn-metadata (:extract-edn-metadata metadata-parser/exports))
 (def safe-tag-strings (:safe-tag-strings metadata-parser/exports))
+(def find-runnote-files (:find-runnote-files runnote-core/exports))
 
 ;; ============================================================================
 ;; Configuration
@@ -99,7 +101,7 @@
 (defn search-by-tag
   "Find all RunNotes with a specific tag"
   [runnote-dir tag]
-  (let [files (fs/glob runnote-dir "RunNotes-*.md")
+  (let [files (find-runnote-files runnote-dir)
         tag (if (str/starts-with? tag ":") tag (str ":" tag))]
     (filter #(some #{tag} (:tags %))
             (map extract-metadata files))))
@@ -107,7 +109,7 @@
 (defn search-by-text
   "Full-text search within RunNotes"
   [runnote-dir query]
-  (let [files (fs/glob runnote-dir "RunNotes-*.md")
+  (let [files (find-runnote-files runnote-dir)
         query-lower (str/lower-case query)]
     (filter (fn [file]
               (str/includes? (str/lower-case (slurp (str file))) query-lower))
@@ -116,7 +118,7 @@
 (defn search-by-phase
   "Find all RunNotes in a specific phase"
   [runnote-dir phase]
-  (let [files (fs/glob runnote-dir "RunNotes-*.md")]
+  (let [files (find-runnote-files runnote-dir)]
     (filter #(and (:phase %)
                   (str/includes? (str/lower-case (:phase %))
                                  (str/lower-case phase)))
@@ -125,7 +127,7 @@
 (defn search-by-state
   "Find all RunNotes in a specific state"
   [runnote-dir state]
-  (let [files (fs/glob runnote-dir "RunNotes-*.md")
+  (let [files (find-runnote-files runnote-dir)
         state-emoji (case (str/lower-case state)
                       "active" "🟢"
                       "investigating" "🟡"
@@ -138,14 +140,14 @@
 (defn list-all-tags
   "List all unique tags used across RunNotes"
   [runnote-dir]
-  (let [files (fs/glob runnote-dir "RunNotes-*.md")
+  (let [files (find-runnote-files runnote-dir)
         all-tags (mapcat :tags (map extract-metadata files))]
     (sort (distinct all-tags))))
 
 (defn summary-report
   "Generate a summary report of all RunNotes"
   [runnote-dir]
-  (let [files (fs/glob runnote-dir "RunNotes-*.md")
+  (let [files (find-runnote-files runnote-dir)
         metadata (map extract-metadata files)
         by-phase (group-by :phase metadata)
         all-tags (mapcat :tags metadata)]

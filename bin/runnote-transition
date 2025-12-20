@@ -16,8 +16,10 @@
 (def lib-dir (str (System/getenv "HOME") "/.lib"))
 (load-file (str lib-dir "/config-core.bb"))
 (load-file (str lib-dir "/metadata-parser.bb"))
+(load-file (str (System/getenv "HOME") "/.runnote/runnote-core.bb"))
 
 (def extract-edn-metadata (:extract-edn-metadata metadata-parser/exports))
+(def find-runnote-files (:find-runnote-files runnote-core/exports))
 
 ;; Configuration resolution (3-tier: CLI → ENV → Config → Default)
 (defn get-runnote-dir
@@ -119,7 +121,7 @@
   (let [parent-name (fs/file-name parent-file)
         topic (second (str/split parent-name #"-"))
         pattern (str "*" topic (str/capitalize sub-mode-type) "*")
-        existing (fs/glob runnotes-dir pattern)]
+        existing (find-runnote-files runnotes-dir {:pattern pattern})]
     (inc (count existing))))
 
 (defn create-sub-mode-file
@@ -333,7 +335,7 @@
 (defn list-blocked
   "List all blocked items across implementation files"
   [args runnotes-dir]
-  (let [files (fs/glob runnotes-dir "RunNotes-*-implementation.md")
+  (let [files (find-runnote-files runnotes-dir {:pattern "RunNotes-*-implementation.md"})
         all-blocked (mapcat (fn [file]
                              (let [content (slurp (str file))
                                    blocked (extract-blocked-items content)]
@@ -438,7 +440,7 @@
   [args runnotes-dir]
   (let [[topic-pattern] args
         pattern (or topic-pattern "*")
-        files (fs/glob runnotes-dir (str "RunNotes-*-" pattern "-*.md"))
+        files (find-runnote-files runnotes-dir {:pattern (str "RunNotes-*-" pattern "-*.md")})
         grouped (group-by #(nth (str/split (fs/file-name %) #"-") 4) files)]
     (if (empty? files)
       (println "No RunNotes files found matching pattern:" pattern)
